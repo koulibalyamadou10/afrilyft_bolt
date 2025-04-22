@@ -186,12 +186,12 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: const Color(0xFFFFECEA),
+                color: isActive ? const Color(0xFFFFECEA) : Colors.grey[200],
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
-                color: const Color(0xFFFF6B5B),
+                color: isActive ? const Color(0xFFFF6B5B) : Colors.grey,
                 size: 24,
               ),
             ),
@@ -206,10 +206,10 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: Colors.black87,
+                          color: isActive ? Colors.black87 : Colors.grey,
                         ),
                       ),
                       if (isPrimary) ...[
@@ -237,7 +237,7 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
                     subtitle,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[600],
+                      color: isActive ? Colors.grey[600] : Colors.grey[400],
                     ),
                   ),
                   if (additionalInfo != null) ...[
@@ -246,7 +246,7 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
                       additionalInfo,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey[600],
+                        color: isActive ? Colors.grey[600] : Colors.grey[400],
                       ),
                     ),
                   ],
@@ -254,46 +254,52 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
               ),
             ),
             
-            // Interrupteur ou bouton "Set as Primary"
-            isActive
-                ? Switch(
-                    value: paymentSwitches[title] ?? false,
-                    onChanged: (value) {
+            // Colonne pour l'interrupteur et le bouton "Set as Primary"
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Interrupteur
+                isActive
+                    ? Switch(
+                        value: paymentSwitches[title] ?? false,
+                        onChanged: (value) {
+                          setState(() {
+                            paymentSwitches[title] = value;
+                          });
+                        },
+                        activeColor: const Color(0xFFFF6B5B),
+                      )
+                    : Switch(
+                        value: false,
+                        onChanged: null,
+                        activeColor: Colors.grey,
+                      ),
+                
+                // Bouton "Set as Primary" (seulement pour les méthodes actives qui ne sont pas déjà primaires)
+                if (isActive && !isPrimary)
+                  TextButton(
+                    onPressed: () {
                       setState(() {
-                        paymentSwitches[title] = value;
+                        primaryMethod = title;
                       });
                     },
-                    activeColor: const Color(0xFFFF6B5B),
-                  )
-                : Switch(
-                    value: false,
-                    onChanged: null,
-                    activeColor: Colors.grey,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: const BorderSide(color: Color(0xFFFF6B5B)),
+                      ),
+                    ),
+                    child: const Text(
+                      'Set as Primary',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFFF6B5B),
+                      ),
+                    ),
                   ),
-            
-            // Bouton "Set as Primary" (seulement pour les méthodes actives qui ne sont pas déjà primaires)
-            if (isActive && !isPrimary)
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    primaryMethod = title;
-                  });
-                },
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: const BorderSide(color: Color(0xFFFF6B5B)),
-                  ),
-                ),
-                child: const Text(
-                  'Set as Primary',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFFFF6B5B),
-                  ),
-                ),
-              ),
+              ],
+            ),
           ],
         ),
       ),

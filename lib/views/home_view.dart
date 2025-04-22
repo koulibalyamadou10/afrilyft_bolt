@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
 import '../controllers/navigation_controller.dart';
 import '../theme/app_colors.dart';
 import 'components/bottom_navigation.dart';
 import 'pages/carpool_page.dart';
-import 'pages/settings_page.dart';
+import 'pages/map_view_page.dart';
 import 'pages/reserve_page.dart';
+import 'pages/settings_page.dart';
 
 class HomeView extends StatelessWidget {
   const HomeView({super.key});
@@ -254,9 +256,15 @@ class RidesPage extends StatelessWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () {
+          // Naviguer vers la page de carte
+          Get.to(() => const MapViewPage(
+            fromLocation: 'Conakry International Airport',
+            toLocation: 'Kaloum Center',
+          ));
+        },
         backgroundColor: AppColors.primary,
-        child: const Icon(Icons.menu, color: AppColors.white),
+        child: const Icon(Icons.map, color: AppColors.white),
       ),
     );
   }

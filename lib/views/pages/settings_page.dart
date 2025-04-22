@@ -1,8 +1,12 @@
+import 'package:afrilyft/views/pages/promo_codes_page.dart';
+import 'package:afrilyft/views/pages/ride_history_page.dart';
+import 'package:afrilyft/views/pages/saved_locations_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../theme/app_colors.dart';
 import 'edit_profile_page.dart';
 import 'payment_methods_page.dart';
+import '../pages/notification_settings_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -121,7 +125,7 @@ class SettingsPage extends StatelessWidget {
               iconBackground: Colors.red.withOpacity(0.1),
               title: 'Saved Locations',
               subtitle: 'Manage your saved addresses',
-              onTap: () {},
+              onTap: () => Get.to(() => const SavedLocationsPage()),
             ),
             
             _buildSettingCard(
@@ -130,7 +134,7 @@ class SettingsPage extends StatelessWidget {
               iconBackground: Colors.blue.withOpacity(0.1),
               title: 'Ride History',
               subtitle: 'View your past rides',
-              onTap: () {},
+              onTap: () => Get.to(() => const RideHistoryPage()),
             ),
             
             _buildSettingCard(
@@ -139,7 +143,7 @@ class SettingsPage extends StatelessWidget {
               iconBackground: Colors.red.withOpacity(0.1),
               title: 'Promo Codes',
               subtitle: 'Manage your promotional offers',
-              onTap: () {},
+              onTap: () => Get.to(() => const PromoCodesPage()),
             ),
             
             // Section Préférences
@@ -150,9 +154,69 @@ class SettingsPage extends StatelessWidget {
               iconColor: Colors.red,
               iconBackground: Colors.red.withOpacity(0.1),
               title: 'Notifications',
-              subtitle: 'Manage your notification settings',
-              onTap: () {},
+              subtitle: 'Manage your notification preferences',
+              onTap: () => Get.to(() => const NotificationSettingsPage()),
             ),
+            
+            _buildSettingCard(
+              icon: Icons.shield_outlined,
+              iconColor: Colors.red,
+              iconBackground: Colors.red.withOpacity(0.1),
+              title: 'Privacy',
+              subtitle: 'Control your privacy settings',
+              onTap: () {
+                // Navigation vers la page de confidentialité
+              },
+            ),
+            
+            _buildSettingCard(
+              icon: Icons.language,
+              iconColor: Colors.blue,
+              iconBackground: Colors.blue.withOpacity(0.1),
+              title: 'Language',
+              subtitle: 'Change your preferred language',
+              onTap: () {
+                // Navigation vers la page de langue
+              },
+            ),
+            
+            // Section Support
+            _buildSectionTitle('Support'),
+            
+            _buildSettingCard(
+              icon: Icons.help_outline,
+              iconColor: Colors.blue,
+              iconBackground: Colors.blue.withOpacity(0.1),
+              title: 'Help & Support',
+              subtitle: 'Get assistance with the app',
+              onTap: () {
+                // Navigation vers la page d'aide
+              },
+            ),
+            
+            _buildSettingCard(
+              icon: Icons.chat_bubble_outline,
+              iconColor: Colors.red,
+              iconBackground: Colors.red.withOpacity(0.1),
+              title: 'Send Feedback',
+              subtitle: 'Help us improve our service',
+              onTap: () {
+                // Navigation vers la page de feedback
+              },
+            ),
+            
+            _buildSettingCard(
+              icon: Icons.info_outline,
+              iconColor: Colors.red,
+              iconBackground: Colors.red.withOpacity(0.1),
+              title: 'About',
+              subtitle: 'App version and information',
+              onTap: () {
+                // Navigation vers la page À propos
+              },
+            ),
+            
+            const SizedBox(height: 24),
           ],
         ),
       ),

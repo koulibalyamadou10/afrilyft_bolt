@@ -1,4 +1,5 @@
 import 'package:afrilyft/views/pages/home_page.dart';
+import 'package:afrilyft/views/pages/login_page.dart' show LoginPage;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -174,6 +175,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   void _goToHomePage() {
-    Get.offAll(() => const HomeView(), transition: Transition.fadeIn);
+    Get.offAll(() => const LoginPage(), transition: Transition.fadeIn);
   }
 } 
