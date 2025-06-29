@@ -11,8 +11,29 @@ class RideTrackingPage extends StatefulWidget {
   State<RideTrackingPage> createState() => _RideTrackingPageState();
 }
 
-class _RideTrackingPageState extends State<RideTrackingPage> {
+class _RideTrackingPageState extends State<RideTrackingPage>
+    with TickerProviderStateMixin {
   final RideController rideController = Get.find<RideController>();
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat();
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,47 +52,88 @@ class _RideTrackingPageState extends State<RideTrackingPage> {
 
         return Stack(
           children: [
-            // Carte (simulée)
+            // Carte (simulée avec animation)
             Container(
               color: Colors.grey[300],
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.map,
-                      size: 100,
-                      color: Colors.grey[600],
+              child: Stack(
+                children: [
+                  // Fond de carte
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.map,
+                          size: 100,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Carte interactive',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Suivi en temps réel',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Carte interactive',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
+                  ),
+
+                  // Chauffeurs à proximité avec animation
+                  if (rideController.isSearchingDriver.value)
+                    ...rideController.nearbyDrivers.map((driver) => Positioned(
+                      top: 200 + (driver.lat * 10).toInt() % 200,
+                      left: 100 + (driver.lon * 10).toInt() % 200,
+                      child: AnimatedBuilder(
+                        animation: _pulseAnimation,
+                        builder: (context, child) => Transform.scale(
+                          scale: _pulseAnimation.value,
+                          child: _buildDriverMarker(isSearching: true),
+                        ),
+                      ),
+                    )),
+
+                  // Chauffeur assigné (si accepté)
+                  if (ride.status == RideStatus.accepted || ride.status == RideStatus.inProgress)
+                    Positioned(
+                      top: 250,
+                      left: 150,
+                      child: _buildDriverMarker(isAssigned: true),
+                    ),
+
+                  // Position du client
+                  Positioned(
+                    bottom: 300,
+                    right: 180,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: Colors.blue,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Intégration Google Maps à venir',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-
-            // Overlay des chauffeurs à proximité
-            if (rideController.isSearchingDriver.value)
-              ...rideController.nearbyDrivers.map((driver) => Positioned(
-                top: 200 + (driver.lat * 10).toInt() % 200,
-                left: 100 + (driver.lon * 10).toInt() % 200,
-                child: _buildDriverMarker(),
-              )),
 
             // En-tête
             Positioned(
@@ -133,12 +195,16 @@ class _RideTrackingPageState extends State<RideTrackingPage> {
     );
   }
 
-  Widget _buildDriverMarker() {
+  Widget _buildDriverMarker({bool isSearching = false, bool isAssigned = false}) {
+    Color markerColor = AppColors.primary;
+    if (isAssigned) markerColor = Colors.green;
+    if (isSearching) markerColor = Colors.orange;
+
     return Container(
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: markerColor,
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 2),
         boxShadow: [
@@ -161,8 +227,9 @@ class _RideTrackingPageState extends State<RideTrackingPage> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Statut
-        Container(
+        // Statut avec animation
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             color: rideController.getStatusColor(ride.status).withOpacity(0.1),
@@ -251,7 +318,7 @@ class _RideTrackingPageState extends State<RideTrackingPage> {
           _buildDriverInfo(ride.driver!),
         ],
 
-        // Recherche en cours
+        // Recherche en cours avec compteur de chauffeurs
         if (rideController.isSearchingDriver.value) ...[
           const SizedBox(height: 20),
           _buildSearchingInfo(),
@@ -396,10 +463,18 @@ class _RideTrackingPageState extends State<RideTrackingPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            '${rideController.nearbyDrivers.length} chauffeurs trouvés à proximité',
+            '${rideController.nearbyDrivers.length} chauffeurs notifiés',
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Les chauffeurs ont 2 minutes pour répondre',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[500],
             ),
           ),
         ],
