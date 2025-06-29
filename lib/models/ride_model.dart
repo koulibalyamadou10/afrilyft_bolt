@@ -52,11 +52,11 @@ class RideModel {
       id: json['id'],
       customerId: json['customer_id'],
       driverId: json['driver_id'],
-      pickupLat: _parseLocation(json['pickup_location'])['lat'],
-      pickupLon: _parseLocation(json['pickup_location'])['lon'],
+      pickupLat: (json['pickup_latitude'] as num).toDouble(),
+      pickupLon: (json['pickup_longitude'] as num).toDouble(),
       pickupAddress: json['pickup_address'],
-      destinationLat: _parseLocation(json['destination_location'])['lat'],
-      destinationLon: _parseLocation(json['destination_location'])['lon'],
+      destinationLat: (json['destination_latitude'] as num).toDouble(),
+      destinationLon: (json['destination_longitude'] as num).toDouble(),
       destinationAddress: json['destination_address'],
       status: RideStatus.values.firstWhere(
         (e) => e.name == json['status'],
@@ -89,27 +89,16 @@ class RideModel {
     );
   }
 
-  static Map<String, double> _parseLocation(dynamic location) {
-    // Parse PostGIS POINT format: "POINT(lon lat)"
-    if (location is String) {
-      final coords = location
-          .replaceAll('POINT(', '')
-          .replaceAll(')', '')
-          .split(' ');
-      return {
-        'lon': double.parse(coords[0]),
-        'lat': double.parse(coords[1]),
-      };
-    }
-    return {'lat': 0.0, 'lon': 0.0};
-  }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'customer_id': customerId,
       'driver_id': driverId,
+      'pickup_latitude': pickupLat,
+      'pickup_longitude': pickupLon,
       'pickup_address': pickupAddress,
+      'destination_latitude': destinationLat,
+      'destination_longitude': destinationLon,
       'destination_address': destinationAddress,
       'status': status.name,
       'fare_amount': fareAmount,
@@ -217,16 +206,73 @@ class DriverLocation {
   });
 
   factory DriverLocation.fromJson(Map<String, dynamic> json) {
-    final location = RideModel._parseLocation(json['location']);
     return DriverLocation(
       id: json['id'],
       driverId: json['driver_id'],
-      lat: location['lat']!,
-      lon: location['lon']!,
+      lat: (json['latitude'] as num).toDouble(),
+      lon: (json['longitude'] as num).toDouble(),
       heading: json['heading']?.toDouble(),
       speed: json['speed']?.toDouble(),
       isAvailable: json['is_available'] ?? true,
       lastUpdated: DateTime.parse(json['last_updated']),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'driver_id': driverId,
+      'latitude': lat,
+      'longitude': lon,
+      'heading': heading,
+      'speed': speed,
+      'is_available': isAvailable,
+      'last_updated': lastUpdated.toIso8601String(),
+    };
+  }
+}
+
+class NotificationModel {
+  final String id;
+  final String userId;
+  final String title;
+  final String message;
+  final NotificationType type;
+  final Map<String, dynamic>? data;
+  final bool isRead;
+  final DateTime createdAt;
+
+  NotificationModel({
+    required this.id,
+    required this.userId,
+    required this.title,
+    required this.message,
+    required this.type,
+    this.data,
+    required this.isRead,
+    required this.createdAt,
+  });
+
+  factory NotificationModel.fromJson(Map<String, dynamic> json) {
+    return NotificationModel(
+      id: json['id'],
+      userId: json['user_id'],
+      title: json['title'],
+      message: json['message'],
+      type: NotificationType.values.firstWhere(
+        (e) => e.name == json['type'],
+        orElse: () => NotificationType.general,
+      ),
+      data: json['data'],
+      isRead: json['is_read'] ?? false,
+      createdAt: DateTime.parse(json['created_at']),
+    );
+  }
+}
+
+enum NotificationType {
+  rideRequest,
+  rideUpdate,
+  payment,
+  general,
 }

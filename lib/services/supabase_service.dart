@@ -17,18 +17,12 @@ class SupabaseService {
     final response = await _client.auth.signUp(
       email: email,
       password: password,
-    );
-    
-    if (response.user != null) {
-      // Créer le profil utilisateur
-      await _client.from('profiles').insert({
-        'id': response.user!.id,
-        'email': email,
+      data: {
         'full_name': fullName,
         'phone': phone,
         'role': role,
-      });
-    }
+      },
+    );
     
     return response;
   }
@@ -147,33 +141,6 @@ class SupabaseService {
     });
     
     return List<Map<String, dynamic>>.from(response);
-  }
-  
-  // Écoute des changements en temps réel
-  static Stream<List<Map<String, dynamic>>> watchUserRides() {
-    final user = _client.auth.currentUser;
-    if (user == null) throw Exception('User not authenticated');
-    
-    return _client
-        .from('rides')
-        .stream(primaryKey: ['id'])
-        .eq('customer_id', user.id)
-        .order('created_at', ascending: false);
-  }
-  
-  static Stream<Map<String, dynamic>?> watchRide(String rideId) {
-    return _client
-        .from('rides')
-        .stream(primaryKey: ['id'])
-        .eq('id', rideId)
-        .map((data) => data.isNotEmpty ? data.first : null);
-  }
-  
-  static Stream<List<Map<String, dynamic>>> watchDriverLocations() {
-    return _client
-        .from('driver_locations')
-        .stream(primaryKey: ['id'])
-        .eq('is_available', true);
   }
   
   // Géolocalisation

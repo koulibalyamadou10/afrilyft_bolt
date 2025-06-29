@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/ride_model.dart';
 import '../services/supabase_service.dart';
+import '../services/realtime_service.dart';
 
 class RideController extends GetxController {
   final Rx<RideModel?> currentRide = Rx<RideModel?>(null);
@@ -16,7 +17,17 @@ class RideController extends GetxController {
     super.onInit();
     _getCurrentLocation();
     _loadRideHistory();
-    _watchCurrentRide();
+    _initializeRealtime();
+  }
+
+  @override
+  void onClose() {
+    RealtimeService.cleanup();
+    super.onClose();
+  }
+
+  Future<void> _initializeRealtime() async {
+    await RealtimeService.initialize();
   }
 
   Future<void> _getCurrentLocation() async {
@@ -33,21 +44,25 @@ class RideController extends GetxController {
       isLoading.value = true;
       final rides = await SupabaseService.getUserRides();
       rideHistory.value = rides.map((json) => RideModel.fromJson(json)).toList();
+      
+      // Vérifier s'il y a un trajet en cours
+      final activeRide = rideHistory.firstWhereOrNull((ride) => 
+        ride.status == RideStatus.searching ||
+        ride.status == RideStatus.accepted ||
+        ride.status == RideStatus.inProgress
+      );
+      
+      if (activeRide != null) {
+        currentRide.value = activeRide;
+        if (activeRide.status == RideStatus.searching) {
+          isSearchingDriver.value = true;
+          await _findNearbyDrivers(activeRide.pickupLat, activeRide.pickupLon);
+        }
+      }
     } catch (e) {
       Get.snackbar('Erreur', 'Impossible de charger l\'historique: $e');
     } finally {
       isLoading.value = false;
-    }
-  }
-
-  void _watchCurrentRide() {
-    // Écouter les changements sur le trajet en cours
-    if (currentRide.value != null) {
-      SupabaseService.watchRide(currentRide.value!.id).listen((rideData) {
-        if (rideData != null) {
-          currentRide.value = RideModel.fromJson(rideData);
-        }
-      });
     }
   }
 
@@ -82,7 +97,6 @@ class RideController extends GetxController {
       final rideData = await SupabaseService.getRideById(rideId);
       if (rideData != null) {
         currentRide.value = RideModel.fromJson(rideData);
-        _watchCurrentRide();
       }
 
       // Rechercher les chauffeurs à proximité
@@ -111,12 +125,14 @@ class RideController extends GetxController {
         maxDrivers: 10,
       );
 
-      // Convertir en DriverLocation (simulation)
+      // Convertir en DriverLocation
       nearbyDrivers.value = drivers.map((driver) => DriverLocation(
         id: driver['driver_id'],
         driverId: driver['driver_id'],
         lat: driver['location_lat'],
         lon: driver['location_lon'],
+        heading: driver['heading']?.toDouble(),
+        speed: driver['speed']?.toDouble(),
         isAvailable: true,
         lastUpdated: DateTime.parse(driver['last_updated']),
       )).toList();
@@ -127,12 +143,62 @@ class RideController extends GetxController {
     }
   }
 
-  void cancelRide() {
+  // Mettre à jour un trajet dans l'historique
+  void updateRideInHistory(RideModel updatedRide) {
+    final index = rideHistory.indexWhere((ride) => ride.id == updatedRide.id);
+    if (index != -1) {
+      rideHistory[index] = updatedRide;
+    } else {
+      rideHistory.insert(0, updatedRide);
+    }
+  }
+
+  // Mettre à jour la position d'un chauffeur
+  void updateDriverLocation(DriverLocation driverLocation) {
+    final index = nearbyDrivers.indexWhere((driver) => driver.driverId == driverLocation.driverId);
+    if (index != -1) {
+      nearbyDrivers[index] = driverLocation;
+    } else {
+      nearbyDrivers.add(driverLocation);
+    }
+  }
+
+  // Annuler un trajet
+  Future<void> cancelRide() async {
     if (currentRide.value != null) {
-      // TODO: Implémenter l'annulation côté Supabase
-      currentRide.value = null;
-      isSearchingDriver.value = false;
-      nearbyDrivers.clear();
+      try {
+        await RealtimeService.updateRideStatus(currentRide.value!.id, 'cancelled');
+        currentRide.value = null;
+        isSearchingDriver.value = false;
+        nearbyDrivers.clear();
+      } catch (e) {
+        Get.snackbar('Erreur', 'Impossible d\'annuler le trajet: $e');
+      }
+    }
+  }
+
+  // Démarrer un trajet (pour les chauffeurs)
+  Future<void> startRide() async {
+    if (currentRide.value != null) {
+      try {
+        await RealtimeService.updateRideStatus(currentRide.value!.id, 'in_progress');
+      } catch (e) {
+        Get.snackbar('Erreur', 'Impossible de démarrer le trajet: $e');
+      }
+    }
+  }
+
+  // Terminer un trajet (pour les chauffeurs)
+  Future<void> completeRide() async {
+    if (currentRide.value != null) {
+      try {
+        await RealtimeService.updateRideStatus(currentRide.value!.id, 'completed');
+        currentRide.value = null;
+        isSearchingDriver.value = false;
+        nearbyDrivers.clear();
+      } catch (e) {
+        Get.snackbar('Erreur', 'Impossible de terminer le trajet: $e');
+      }
     }
   }
 
