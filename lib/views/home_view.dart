@@ -2,20 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../controllers/navigation_controller.dart';
+import '../controllers/ride_controller.dart';
 import '../theme/app_colors.dart';
 import 'components/bottom_navigation.dart';
 import 'pages/carpool_page.dart';
-import 'pages/map_view_page.dart';
-import 'pages/reserve_page.dart';
 import 'pages/settings_page.dart';
+import 'pages/create_ride_page.dart';
+import 'pages/ride_history_page.dart';
+import 'pages/ride_tracking_page.dart';
 
 class HomeView extends StatelessWidget {
   const HomeView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Initialiser le contrôleur de navigation
+    // Initialiser les contrôleurs
     final NavigationController navigationController = Get.put(NavigationController());
+    final RideController rideController = Get.put(RideController());
     
     // Liste des pages à afficher
     final List<Widget> pages = [
@@ -41,13 +44,21 @@ class RidesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final RideController rideController = Get.find<RideController>();
+
     return Scaffold(
       backgroundColor: AppColors.secondary,
       appBar: AppBar(
         backgroundColor: AppColors.secondary,
         elevation: 0,
-        title: const Text('Rides', style: TextStyle(color: AppColors.white)),
+        title: const Text('AfriLyft', style: TextStyle(color: AppColors.white, fontWeight: FontWeight.bold)),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history, color: Colors.white),
+            onPressed: () => Get.to(() => const RideHistoryPage()),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Padding(
@@ -55,78 +66,103 @@ class RidesPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Barre de recherche
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[900],
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(8),
-                          bottomLeft: Radius.circular(8),
-                        ),
-                      ),
-                      child: const TextField(
-                        style: TextStyle(color: AppColors.white),
-                        decoration: InputDecoration(
-                          hintText: 'Where to?',
-                          hintStyle: TextStyle(color: AppColors.mediumGrey),
-                          prefixIcon: Icon(Icons.search, color: AppColors.mediumGrey),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(vertical: 15),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    height: 50,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+              // Trajet en cours (si existant)
+              Obx(() {
+                final currentRide = rideController.currentRide.value;
+                if (currentRide != null) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: AppColors.primary,
-                      borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(8),
-                        bottomRight: Radius.circular(8),
-                      ),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Center(
-                      child: Text(
-                        'Search',
-                        style: TextStyle(
-                          color: AppColors.white,
-                          fontWeight: FontWeight.bold,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.directions_car, color: Colors.white),
+                            const SizedBox(width: 8),
+                            Text(
+                              rideController.getStatusText(currentRide.status),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${currentRide.pickupAddress} → ${currentRide.destinationAddress}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => Get.to(() => const RideTrackingPage()),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: AppColors.primary,
+                            ),
+                            child: const Text('Voir le trajet'),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
+                  );
+                }
+                return const SizedBox.shrink();
+              }),
               
-              const SizedBox(height: 16),
-              
-              // Bouton "Reserve for Later"
+              // Barre de recherche principale
               GestureDetector(
-                onTap: () {
-                  Get.to(() => const ReservePage(), transition: Transition.rightToLeft);
-                },
+                onTap: () => Get.to(() => const CreateRidePage()),
                 child: Container(
                   width: double.infinity,
-                  height: 50,
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.grey[900],
-                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.access_time, color: AppColors.white),
-                      SizedBox(width: 8),
-                      Text(
-                        'Reserve for Later',
-                        style: TextStyle(
-                          color: AppColors.white,
-                          fontWeight: FontWeight.w500,
+                    children: [
+                      const Icon(Icons.search, color: Colors.grey),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Où allez-vous ?',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_forward,
+                          color: Colors.white,
+                          size: 20,
                         ),
                       ),
                     ],
@@ -165,7 +201,7 @@ class RidesPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Welcome to Afrilyft Guinea',
+                        'Bienvenue sur AfriLyft Guinée',
                         style: TextStyle(
                           color: AppColors.white,
                           fontSize: 20,
@@ -174,7 +210,7 @@ class RidesPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Safe and reliable rides throughout Guinea. Explore Conakry, Kindia, and beyond with trusted local drivers.',
+                        'Des trajets sûrs et fiables dans toute la Guinée. Explorez Conakry, Kindia et au-delà avec des chauffeurs locaux de confiance.',
                         style: TextStyle(
                           color: AppColors.lightGrey,
                           fontSize: 14,
@@ -184,7 +220,7 @@ class RidesPage extends StatelessWidget {
                       Row(
                         children: const [
                           Text(
-                            'Learn more',
+                            'En savoir plus',
                             style: TextStyle(
                               color: AppColors.primary,
                               fontWeight: FontWeight.w500,
@@ -210,7 +246,7 @@ class RidesPage extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Suggestions',
+                    'Services',
                     style: TextStyle(
                       color: AppColors.white,
                       fontSize: 18,
@@ -220,7 +256,7 @@ class RidesPage extends StatelessWidget {
                   TextButton(
                     onPressed: () {},
                     child: const Text(
-                      'See all',
+                      'Voir tout',
                       style: TextStyle(
                         color: AppColors.mediumGrey,
                       ),
@@ -236,35 +272,27 @@ class RidesPage extends StatelessWidget {
                 children: [
                   _buildOptionCard(
                     icon: Icons.directions_car,
-                    label: 'Ride',
+                    label: 'Trajet',
                     isPromo: true,
+                    onTap: () => Get.to(() => const CreateRidePage()),
                   ),
                   const SizedBox(width: 12),
                   _buildOptionCard(
                     icon: Icons.access_time,
-                    label: 'Reserve',
+                    label: 'Programmer',
+                    onTap: () => Get.to(() => const CreateRidePage()),
                   ),
                   const SizedBox(width: 12),
                   _buildOptionCard(
                     icon: Icons.route,
-                    label: 'Long Distance',
+                    label: 'Longue distance',
+                    onTap: () => Get.to(() => const CreateRidePage()),
                   ),
                 ],
               ),
             ],
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Naviguer vers la page de carte
-          Get.to(() => const MapViewPage(
-            fromLocation: 'Conakry International Airport',
-            toLocation: 'Kaloum Center',
-          ));
-        },
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.map, color: AppColors.white),
       ),
     );
   }
@@ -273,57 +301,61 @@ class RidesPage extends StatelessWidget {
     required IconData icon,
     required String label,
     bool isPromo = false,
+    VoidCallback? onTap,
   }) {
     return Expanded(
-      child: Container(
-        height: 100,
-        decoration: BoxDecoration(
-          color: Colors.grey[900],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Stack(
-          children: [
-            if (isPromo)
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.success,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'Promo',
-                    style: TextStyle(
-                      color: AppColors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 100,
+          decoration: BoxDecoration(
+            color: Colors.grey[900],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Stack(
+            children: [
+              if (isPromo)
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.success,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'Promo',
+                      style: TextStyle(
+                        color: AppColors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    icon,
-                    color: AppColors.white,
-                    size: 28,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    label,
-                    style: const TextStyle(
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      icon,
                       color: AppColors.white,
-                      fontSize: 14,
+                      size: 28,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: AppColors.white,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
