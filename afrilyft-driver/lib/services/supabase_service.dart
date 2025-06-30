@@ -3,9 +3,9 @@ import 'package:geolocator/geolocator.dart';
 
 class SupabaseService {
   static final SupabaseClient _client = Supabase.instance.client;
-  
+
   static SupabaseClient get client => _client;
-  
+
   // Authentification
   static Future<AuthResponse> signUp({
     required String email,
@@ -18,20 +18,16 @@ class SupabaseService {
       final response = await _client.auth.signUp(
         email: email,
         password: password,
-        data: {
-          'full_name': fullName,
-          'phone': phone,
-          'role': role,
-        },
+        data: {'full_name': fullName, 'phone': phone, 'role': role},
       );
-      
+
       return response;
     } catch (e) {
       print('Erreur lors de l\'inscription: $e');
       rethrow;
     }
   }
-  
+
   static Future<AuthResponse> signIn({
     required String email,
     required String password,
@@ -46,38 +42,32 @@ class SupabaseService {
       rethrow;
     }
   }
-  
+
   static Future<void> signOut() async {
     await _client.auth.signOut();
   }
-  
+
   // Profil utilisateur
   static Future<Map<String, dynamic>?> getCurrentUserProfile() async {
     final user = _client.auth.currentUser;
     if (user == null) return null;
-    
+
     try {
-      final response = await _client
-          .from('profiles')
-          .select()
-          .eq('id', user.id)
-          .single();
-      
+      final response =
+          await _client.from('profiles').select().eq('id', user.id).single();
+
       return response;
     } catch (e) {
       print('Erreur lors de la récupération du profil: $e');
       return null;
     }
   }
-  
+
   static Future<void> updateProfile(Map<String, dynamic> updates) async {
     final user = _client.auth.currentUser;
     if (user == null) throw Exception('User not authenticated');
-    
-    await _client
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id);
+
+    await _client.from('profiles').update(updates).eq('id', user.id);
   }
 
   // Fonctions pour l'app chauffeur
@@ -86,6 +76,7 @@ class SupabaseService {
     if (user == null) throw Exception('User not authenticated');
     
     try {
+      // Récupérer toutes les demandes disponibles (non assignées)
       final response = await _client
           .from('ride_requests')
           .select('''
@@ -95,12 +86,17 @@ class SupabaseService {
               customer:profiles!rides_customer_id_fkey(full_name, phone)
             )
           ''')
-          .eq('driver_id', user.id)
           .eq('status', 'sent')
           .gt('expires_at', DateTime.now().toIso8601String())
           .order('sent_at', ascending: false);
       
-      return List<Map<String, dynamic>>.from(response);
+      // Filtrer les demandes non assignées côté client
+      final List<Map<String, dynamic>> allRequests = List<Map<String, dynamic>>.from(response);
+      final List<Map<String, dynamic>> availableRequests = allRequests.where((request) => 
+        request['driver_id'] == null
+      ).toList();
+      
+      return availableRequests;
     } catch (e) {
       print('Erreur lors de la récupération des demandes: $e');
       return [];
@@ -113,21 +109,22 @@ class SupabaseService {
 
     try {
       // Récupérer les détails de la demande
-      final requestData = await _client
-          .from('ride_requests')
-          .select('ride_id')
-          .eq('id', requestId)
-          .eq('driver_id', user.id)
-          .single();
+      final requestData =
+          await _client
+              .from('ride_requests')
+              .select('ride_id')
+              .eq('id', requestId)
+              .eq('driver_id', user.id)
+              .single();
 
       final rideId = requestData['ride_id'];
 
       // Utiliser la fonction accept_ride
-      final result = await _client.rpc('accept_ride', params: {
-        'p_ride_id': rideId,
-        'p_driver_id': user.id,
-      });
-      
+      final result = await _client.rpc(
+        'accept_ride',
+        params: {'p_ride_id': rideId, 'p_driver_id': user.id},
+      );
+
       return result as bool;
     } catch (e) {
       print('Erreur lors de l\'acceptation: $e');
@@ -159,13 +156,11 @@ class SupabaseService {
     if (user == null) throw Exception('User not authenticated');
 
     try {
-      await _client
-          .from('driver_locations')
-          .upsert({
-            'driver_id': user.id,
-            'is_available': isAvailable,
-            'last_updated': DateTime.now().toIso8601String(),
-          });
+      await _client.from('driver_locations').upsert({
+        'driver_id': user.id,
+        'is_available': isAvailable,
+        'last_updated': DateTime.now().toIso8601String(),
+      });
     } catch (e) {
       print('Erreur lors de la mise à jour de disponibilité: $e');
       rethrow;
@@ -173,11 +168,14 @@ class SupabaseService {
   }
 
   // Fonction pour récupérer un trajet par ID de demande
-  static Future<Map<String, dynamic>?> getRideByRequestId(String requestId) async {
+  static Future<Map<String, dynamic>?> getRideByRequestId(
+    String requestId,
+  ) async {
     try {
-      final response = await _client
-          .from('ride_requests')
-          .select('''
+      final response =
+          await _client
+              .from('ride_requests')
+              .select('''
             ride_id,
             rides!inner(
               *,
@@ -185,9 +183,9 @@ class SupabaseService {
               driver:profiles!rides_driver_id_fkey(full_name, phone)
             )
           ''')
-          .eq('id', requestId)
-          .single();
-      
+              .eq('id', requestId)
+              .single();
+
       return response['rides'];
     } catch (e) {
       print('Erreur lors de la récupération du trajet par demande: $e');
@@ -197,23 +195,24 @@ class SupabaseService {
 
   static Future<Map<String, dynamic>?> getRideById(String rideId) async {
     try {
-      final response = await _client
-          .from('rides')
-          .select('''
+      final response =
+          await _client
+              .from('rides')
+              .select('''
             *,
             customer:profiles!rides_customer_id_fkey(full_name, phone),
             driver:profiles!rides_driver_id_fkey(full_name, phone)
           ''')
-          .eq('id', rideId)
-          .single();
-      
+              .eq('id', rideId)
+              .single();
+
       return response;
     } catch (e) {
       print('Erreur lors de la récupération du trajet: $e');
       return null;
     }
   }
-  
+
   // Géolocalisation
   static Future<Position> getCurrentLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -228,7 +227,7 @@ class SupabaseService {
         throw Exception('Location permissions are denied');
       }
     }
-    
+
     if (permission == LocationPermission.deniedForever) {
       throw Exception('Location permissions are permanently denied');
     }
@@ -237,7 +236,7 @@ class SupabaseService {
       desiredAccuracy: LocationAccuracy.high,
     );
   }
-  
+
   // Calcul de distance
   static double calculateDistance(
     double startLatitude,
@@ -246,10 +245,11 @@ class SupabaseService {
     double endLongitude,
   ) {
     return Geolocator.distanceBetween(
-      startLatitude,
-      startLongitude,
-      endLatitude,
-      endLongitude,
-    ) / 1000; // Retourne en kilomètres
+          startLatitude,
+          startLongitude,
+          endLatitude,
+          endLongitude,
+        ) /
+        1000; // Retourne en kilomètres
   }
 }

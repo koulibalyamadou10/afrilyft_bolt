@@ -67,25 +67,29 @@ class RideModel {
       estimatedDurationMinutes: json['estimated_duration_minutes'],
       paymentMethod: json['payment_method'] ?? 'cash',
       notes: json['notes'],
-      scheduledFor: json['scheduled_for'] != null 
-          ? DateTime.parse(json['scheduled_for']) 
-          : null,
+      scheduledFor:
+          json['scheduled_for'] != null
+              ? DateTime.parse(json['scheduled_for'])
+              : null,
       createdAt: DateTime.parse(json['created_at']),
-      acceptedAt: json['accepted_at'] != null 
-          ? DateTime.parse(json['accepted_at']) 
-          : null,
-      startedAt: json['started_at'] != null 
-          ? DateTime.parse(json['started_at']) 
-          : null,
-      completedAt: json['completed_at'] != null 
-          ? DateTime.parse(json['completed_at']) 
-          : null,
-      customer: json['customer'] != null 
-          ? UserProfile.fromJson(json['customer']) 
-          : null,
-      driver: json['driver'] != null 
-          ? UserProfile.fromJson(json['driver']) 
-          : null,
+      acceptedAt:
+          json['accepted_at'] != null
+              ? DateTime.parse(json['accepted_at'])
+              : null,
+      startedAt:
+          json['started_at'] != null
+              ? DateTime.parse(json['started_at'])
+              : null,
+      completedAt:
+          json['completed_at'] != null
+              ? DateTime.parse(json['completed_at'])
+              : null,
+      customer:
+          json['customer'] != null
+              ? UserProfile.fromJson(json['customer'])
+              : null,
+      driver:
+          json['driver'] != null ? UserProfile.fromJson(json['driver']) : null,
     );
   }
 
@@ -179,10 +183,7 @@ class UserProfile {
   }
 }
 
-enum UserRole {
-  customer,
-  driver,
-}
+enum UserRole { customer, driver }
 
 class DriverLocation {
   final String id;
@@ -270,9 +271,42 @@ class NotificationModel {
   }
 }
 
-enum NotificationType {
-  rideRequest,
-  rideUpdate,
-  payment,
-  general,
+enum NotificationType { rideRequest, rideUpdate, payment, general }
+
+class RideRequest {
+  final String id;
+  final String rideId;
+  final String? customerName;
+  final String pickupAddress;
+  final String destinationAddress;
+  final DateTime sentAt;
+  final DateTime expiresAt;
+
+  RideRequest({
+    required this.id,
+    required this.rideId,
+    this.customerName,
+    required this.pickupAddress,
+    required this.destinationAddress,
+    required this.sentAt,
+    required this.expiresAt,
+  });
+
+  factory RideRequest.fromJson(Map<String, dynamic> json) {
+    return RideRequest(
+      id: json['id'],
+      rideId: json['ride_id'],
+      customerName: json['customer_name'],
+      pickupAddress: json['pickup_address'] ?? '',
+      destinationAddress: json['destination_address'] ?? '',
+      sentAt: DateTime.parse(json['sent_at']),
+      expiresAt: DateTime.parse(json['expires_at']),
+    );
+  }
+
+  int get timeRemaining {
+    final now = DateTime.now();
+    final remaining = expiresAt.difference(now).inSeconds;
+    return remaining > 0 ? remaining : 0;
+  }
 }

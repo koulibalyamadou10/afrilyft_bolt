@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/driver_controller.dart';
 import '../../theme/app_colors.dart';
+import '../../models/ride_model.dart';
+import 'ride_requests_page.dart';
 
 class DriverHomePage extends StatelessWidget {
   const DriverHomePage({Key? key}) : super(key: key);
@@ -15,7 +17,10 @@ class DriverHomePage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.driverPrimary,
         elevation: 0,
-        title: const Text('AfriLyft Driver', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'AfriLyft Driver',
+          style: TextStyle(color: Colors.white),
+        ),
         centerTitle: true,
         actions: [
           IconButton(
@@ -31,14 +36,36 @@ class DriverHomePage extends StatelessWidget {
             children: [
               // Statut en ligne/hors ligne
               Obx(() => _buildStatusCard(driverController)),
-              
+
               const SizedBox(height: 20),
-              
+
               // Statistiques du jour
               _buildStatsCard(),
-              
+
               const SizedBox(height: 20),
-              
+
+              // Bouton pour voir les demandes avec carte
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 16),
+                child: ElevatedButton.icon(
+                  onPressed: () => Get.to(() => const RideRequestsPage()),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.driverPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.map),
+                  label: const Text(
+                    'Voir les demandes sur la carte',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+
               // Demandes en attente
               Expanded(
                 child: Obx(() => _buildPendingRequests(driverController)),
@@ -78,18 +105,18 @@ class DriverHomePage extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: controller.isOnline.value ? Colors.green : Colors.grey,
+                      color:
+                          controller.isOnline.value
+                              ? Colors.green
+                              : Colors.grey,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    controller.isOnline.value 
+                    controller.isOnline.value
                         ? 'Prêt à recevoir des demandes'
                         : 'Vous ne recevez pas de demandes',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -100,7 +127,7 @@ class DriverHomePage extends StatelessWidget {
               ),
             ],
           ),
-          
+
           if (controller.isOnline.value) ...[
             const SizedBox(height: 16),
             Container(
@@ -151,10 +178,7 @@ class DriverHomePage extends StatelessWidget {
         children: [
           const Text(
             'Statistiques du jour',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           Row(
@@ -177,18 +201,9 @@ class DriverHomePage extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
       ],
     );
   }
@@ -205,11 +220,7 @@ class DriverHomePage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.inbox,
-                size: 64,
-                color: Colors.grey[400],
-              ),
+              Icon(Icons.inbox, size: 64, color: Colors.grey[400]),
               const SizedBox(height: 16),
               Text(
                 'Aucune demande en attente',
@@ -221,13 +232,10 @@ class DriverHomePage extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                controller.isOnline.value 
+                controller.isOnline.value
                     ? 'Les nouvelles demandes apparaîtront ici'
                     : 'Activez le mode en ligne pour recevoir des demandes',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[500],
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -248,10 +256,7 @@ class DriverHomePage extends StatelessWidget {
             padding: EdgeInsets.all(16),
             child: Text(
               'Demandes en attente',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
           Expanded(
@@ -309,9 +314,9 @@ class DriverHomePage extends StatelessWidget {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           Row(
             children: [
               const Icon(Icons.location_on, color: Colors.green, size: 16),
@@ -326,9 +331,9 @@ class DriverHomePage extends StatelessWidget {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 4),
-          
+
           Row(
             children: [
               const Icon(Icons.flag, color: Colors.red, size: 16),
@@ -343,9 +348,9 @@ class DriverHomePage extends StatelessWidget {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           Row(
             children: [
               Expanded(
@@ -365,7 +370,10 @@ class DriverHomePage extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.driverPrimary,
                   ),
-                  child: const Text('Accepter', style: TextStyle(color: Colors.white)),
+                  child: const Text(
+                    'Accepter',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
               ),
             ],
@@ -373,44 +381,5 @@ class DriverHomePage extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-// Modèle pour les demandes de trajet
-class RideRequest {
-  final String id;
-  final String rideId;
-  final String? customerName;
-  final String pickupAddress;
-  final String destinationAddress;
-  final DateTime sentAt;
-  final DateTime expiresAt;
-
-  RideRequest({
-    required this.id,
-    required this.rideId,
-    this.customerName,
-    required this.pickupAddress,
-    required this.destinationAddress,
-    required this.sentAt,
-    required this.expiresAt,
-  });
-
-  factory RideRequest.fromJson(Map<String, dynamic> json) {
-    return RideRequest(
-      id: json['id'],
-      rideId: json['ride_id'],
-      customerName: json['customer_name'],
-      pickupAddress: json['pickup_address'] ?? '',
-      destinationAddress: json['destination_address'] ?? '',
-      sentAt: DateTime.parse(json['sent_at']),
-      expiresAt: DateTime.parse(json['expires_at']),
-    );
-  }
-
-  int get timeRemaining {
-    final now = DateTime.now();
-    final remaining = expiresAt.difference(now).inSeconds;
-    return remaining > 0 ? remaining : 0;
   }
 }

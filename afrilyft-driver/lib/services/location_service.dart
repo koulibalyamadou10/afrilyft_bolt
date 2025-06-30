@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'package:geolocator/geolocator.dart';
-import 'package:get/get.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
-import 'realtime_service.dart';
 
 class LocationService {
   static bool _isTracking = false;
@@ -24,7 +24,7 @@ class LocationService {
         throw Exception('Permissions de localisation refusées');
       }
     }
-    
+
     if (permission == LocationPermission.deniedForever) {
       throw Exception('Permissions de localisation refusées définitivement');
     }
@@ -41,7 +41,7 @@ class LocationService {
     if (_isTracking) return;
 
     _isTracking = true;
-    
+
     const LocationSettings locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 10, // Mise à jour tous les 10 mètres
@@ -74,8 +74,8 @@ class LocationService {
       final speed = position.speed * 3.6; // Convertir m/s en km/h
       final heading = position.heading;
 
-      // Mettre à jour via Realtime Service
-      RealtimeService.updateDriverLocation(
+      // Mettre à jour via Supabase Service
+      _updateDriverLocationInDatabase(
         latitude: position.latitude,
         longitude: position.longitude,
         heading: heading,
@@ -83,9 +83,39 @@ class LocationService {
         isAvailable: true,
       );
 
-      print('📍 Position mise à jour: ${position.latitude}, ${position.longitude}');
+      print(
+        '📍 Position mise à jour: ${position.latitude}, ${position.longitude}',
+      );
     } catch (e) {
       print('Erreur lors de la mise à jour de position: $e');
+    }
+  }
+
+  // Mettre à jour la position dans la base de données
+  static Future<void> _updateDriverLocationInDatabase({
+    required double latitude,
+    required double longitude,
+    double? heading,
+    double? speed,
+    required bool isAvailable,
+  }) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+
+      if (user != null) {
+        await supabase.from('driver_locations').upsert({
+          'driver_id': user.id,
+          'latitude': latitude,
+          'longitude': longitude,
+          'heading': heading,
+          'speed': speed,
+          'is_available': isAvailable,
+          'last_updated': DateTime.now().toIso8601String(),
+        });
+      }
+    } catch (e) {
+      print('Erreur lors de la mise à jour en base: $e');
     }
   }
 

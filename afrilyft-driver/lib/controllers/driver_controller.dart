@@ -36,7 +36,8 @@ class DriverController extends GetxController {
   Future<void> _loadPendingRequests() async {
     try {
       final requests = await SupabaseService.getDriverRideRequests();
-      pendingRequests.value = requests.map((json) => RideRequest.fromJson(json)).toList();
+      pendingRequests.value =
+          requests.map((json) => RideRequest.fromJson(json)).toList();
     } catch (e) {
       print('Erreur lors du chargement des demandes: $e');
     }
@@ -44,26 +45,10 @@ class DriverController extends GetxController {
 
   void _initializeRealtime() {
     RealtimeService.initialize();
-    
-    // Écouter les nouvelles demandes de trajet
-    RealtimeService.subscribeToRideRequests((request) {
-      pendingRequests.add(RideRequest.fromJson(request));
-      _showNewRideRequestNotification(request);
-    });
-  }
 
-  void _showNewRideRequestNotification(Map<String, dynamic> request) {
-    Get.snackbar(
-      '🚗 Nouvelle demande',
-      'Un client souhaite effectuer un trajet',
-      duration: const Duration(seconds: 10),
-      backgroundColor: Get.theme.primaryColor,
-      colorText: Get.theme.colorScheme.onPrimary,
-      mainButton: TextButton(
-        onPressed: () => _viewRideRequest(request['id']),
-        child: const Text('Voir', style: TextStyle(color: Colors.white)),
-      ),
-    );
+    // Pour l'instant, on charge les demandes périodiquement
+    // Le temps réel sera implémenté plus tard
+    _loadPendingRequests();
   }
 
   void _viewRideRequest(String requestId) {
@@ -78,10 +63,10 @@ class DriverController extends GetxController {
       if (success) {
         // Supprimer la demande de la liste
         pendingRequests.removeWhere((req) => req.id == requestId);
-        
+
         // Charger les détails du trajet accepté
         await _loadCurrentRide(requestId);
-        
+
         Get.snackbar('Succès', 'Trajet accepté !');
         Get.toNamed('/ride-tracking');
       } else {
@@ -118,7 +103,7 @@ class DriverController extends GetxController {
   Future<void> toggleOnlineStatus() async {
     try {
       isOnline.value = !isOnline.value;
-      
+
       if (isOnline.value) {
         // Démarrer le suivi de position
         await LocationService.startLocationTracking();
@@ -126,13 +111,15 @@ class DriverController extends GetxController {
         // Arrêter le suivi de position
         await LocationService.stopLocationTracking();
       }
-      
+
       // Mettre à jour le statut dans la base de données
       await SupabaseService.updateDriverAvailability(isOnline.value);
-      
+
       Get.snackbar(
         isOnline.value ? 'En ligne' : 'Hors ligne',
-        isOnline.value ? 'Vous recevrez maintenant des demandes' : 'Vous ne recevrez plus de demandes',
+        isOnline.value
+            ? 'Vous recevrez maintenant des demandes'
+            : 'Vous ne recevrez plus de demandes',
       );
     } catch (e) {
       Get.snackbar('Erreur', 'Impossible de changer le statut: $e');
@@ -143,7 +130,10 @@ class DriverController extends GetxController {
   Future<void> startRide() async {
     if (currentRide.value != null) {
       try {
-        await RealtimeService.updateRideStatus(currentRide.value!.id, 'in_progress');
+        await RealtimeService.updateRideStatus(
+          currentRide.value!.id,
+          'in_progress',
+        );
         Get.snackbar('Trajet démarré', 'Le client a été notifié');
       } catch (e) {
         Get.snackbar('Erreur', 'Impossible de démarrer le trajet: $e');
@@ -155,7 +145,10 @@ class DriverController extends GetxController {
   Future<void> completeRide() async {
     if (currentRide.value != null) {
       try {
-        await RealtimeService.updateRideStatus(currentRide.value!.id, 'completed');
+        await RealtimeService.updateRideStatus(
+          currentRide.value!.id,
+          'completed',
+        );
         currentRide.value = null;
         Get.snackbar('Trajet terminé', 'Merci pour votre service !');
         Get.offAllNamed('/driver-home');
