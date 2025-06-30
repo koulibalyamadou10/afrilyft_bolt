@@ -70,8 +70,8 @@ class AuthController extends GetxController {
       if (profile != null) {
         userProfile.value = UserProfile.fromJson(profile);
 
-        // Don't navigate here, let splash screen handle it
-        // Get.offAll(() => const HomeView());
+        // Navigate to home view after profile is loaded
+        Get.offAll(() => const HomeView());
       }
     } catch (e) {
       print('Erreur lors du chargement du profil: $e');

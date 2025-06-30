@@ -150,6 +150,8 @@ class RideController extends GetxController {
       final rideData = await SupabaseService.getRideById(rideId);
       if (rideData != null) {
         currentRide.value = RideModel.fromJson(rideData);
+        // Ajouter à l'historique
+        rideHistory.insert(0, currentRide.value!);
       }
 
       // 3. Afficher le message de confirmation
