@@ -1,0 +1,45 @@
+name: afrilyft_driver
+description: "Application chauffeur AfriLyft"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  get: ^4.6.5
+  cupertino_icons: ^1.0.8
+  
+  # Supabase (même configuration)
+  supabase_flutter: ^2.5.6
+  
+  # Géolocalisation
+  geolocator: ^12.0.0
+  geocoding: ^3.0.0
+  
+  # Cartes
+  google_maps_flutter: ^2.6.1
+  
+  # Permissions
+  permission_handler: ^11.3.1
+  
+  # HTTP et JSON
+  http: ^1.2.1
+  
+  # Notifications push
+  firebase_core: ^2.31.0
+  firebase_messaging: ^14.9.2
+  flutter_local_notifications: ^17.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
