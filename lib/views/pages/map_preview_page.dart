@@ -37,6 +37,7 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
   final RideController rideController = Get.find<RideController>();
   bool _showingDrivers = false;
   bool _mapError = false;
+  bool _isCreatingRide = false;
   GoogleMapController? _mapController;
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
@@ -143,22 +144,41 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
   }
 
   Future<void> _startRideSearch() async {
-    // Créer le trajet et démarrer la recherche
-    await rideController.createRide(
-      pickupLat: widget.pickupLat,
-      pickupLon: widget.pickupLon,
-      pickupAddress: widget.pickupAddress,
-      destinationLat: widget.destinationLat,
-      destinationLon: widget.destinationLon,
-      destinationAddress: widget.destinationAddress,
-      paymentMethod: widget.paymentMethod,
-      notes: widget.notes,
-      scheduledFor: widget.scheduledFor,
-    );
+    if (_isCreatingRide) return;
+    
+    setState(() {
+      _isCreatingRide = true;
+    });
+    
+    try {
+      // Créer le trajet et démarrer la recherche
+      await rideController.createRide(
+        pickupLat: widget.pickupLat,
+        pickupLon: widget.pickupLon,
+        pickupAddress: widget.pickupAddress,
+        destinationLat: widget.destinationLat,
+        destinationLon: widget.destinationLon,
+        destinationAddress: widget.destinationAddress,
+        paymentMethod: widget.paymentMethod,
+        notes: widget.notes,
+        scheduledFor: widget.scheduledFor,
+      );
 
-    if (rideController.currentRide.value != null) {
-      // Naviguer vers la page de suivi
-      Get.off(() => const RideTrackingPage());
+      if (rideController.currentRide.value != null) {
+        // Naviguer vers la page de suivi
+        Get.off(() => const RideTrackingPage());
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Erreur',
+        'Impossible de créer le trajet: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      setState(() {
+        _isCreatingRide = false;
+      });
     }
   }
 
@@ -537,7 +557,7 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _showingDrivers ? null : _startRideSearch,
+                      onPressed: _isCreatingRide ? null : _startRideSearch,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
@@ -546,25 +566,24 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child:
-                          _showingDrivers
-                              ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                  strokeWidth: 2,
+                      child: _isCreatingRide
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
                                 ),
-                              )
-                              : const Text(
-                                'Confirmer le trajet',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                strokeWidth: 2,
                               ),
+                            )
+                          : const Text(
+                              'Confirmer le trajet',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                 ],

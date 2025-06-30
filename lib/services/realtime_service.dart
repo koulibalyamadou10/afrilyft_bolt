@@ -51,7 +51,7 @@ class RealtimeService {
           table: 'rides',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
-            column: 'customer_id',
+            column: authController.isCustomer ? 'customer_id' : 'driver_id',
             value: userId,
           ),
           callback: (payload) {
@@ -373,5 +373,11 @@ class RealtimeService {
   static void subscribeToRideUpdates(Function(Map<String, dynamic>) onRideUpdate) {
     // Cette fonction sera appelée par le RideController
     // pour écouter spécifiquement les mises à jour de trajets
+  }
+
+  // NOUVEAU: Fonction pour s'abonner aux demandes de trajet
+  static void subscribeToRideRequests(Function(Map<String, dynamic>) onRideRequest) {
+    // Cette fonction sera appelée par le DriverController
+    // pour écouter spécifiquement les nouvelles demandes de trajet
   }
 }
