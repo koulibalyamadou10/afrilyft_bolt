@@ -4,7 +4,7 @@ import '../models/ride_model.dart';
 import '../services/supabase_service.dart';
 import '../services/realtime_service.dart';
 import 'dart:math';
-import 'package:flutter/material.dart';   
+import 'package:flutter/material.dart';
 
 class RideController extends GetxController {
   final Rx<RideModel?> currentRide = Rx<RideModel?>(null);
@@ -30,15 +30,15 @@ class RideController extends GetxController {
 
   Future<void> _initializeRealtime() async {
     await RealtimeService.initialize();
-    
+
     // Écouter les changements de statut des trajets
     RealtimeService.subscribeToRideUpdates((rideData) {
       final ride = RideModel.fromJson(rideData);
-      
+
       // Si c'est notre trajet actuel
       if (currentRide.value?.id == ride.id) {
         currentRide.value = ride;
-        
+
         // Si le trajet a été accepté, arrêter la recherche
         if (ride.status == RideStatus.accepted) {
           isSearchingDriver.value = false;
@@ -49,7 +49,7 @@ class RideController extends GetxController {
           );
         }
       }
-      
+
       // Mettre à jour l'historique
       updateRideInHistory(ride);
     });
@@ -68,20 +68,25 @@ class RideController extends GetxController {
     try {
       isLoading.value = true;
       final rides = await SupabaseService.getUserRides();
-      rideHistory.value = rides.map((json) => RideModel.fromJson(json)).toList();
-      
+      rideHistory.value =
+          rides.map((json) => RideModel.fromJson(json)).toList();
+
       // Vérifier s'il y a un trajet en cours
-      final activeRide = rideHistory.firstWhereOrNull((ride) => 
-        ride.status == RideStatus.searching ||
-        ride.status == RideStatus.accepted ||
-        ride.status == RideStatus.inProgress
+      final activeRide = rideHistory.firstWhereOrNull(
+        (ride) =>
+            ride.status == RideStatus.searching ||
+            ride.status == RideStatus.accepted ||
+            ride.status == RideStatus.inProgress,
       );
-      
+
       if (activeRide != null) {
         currentRide.value = activeRide;
         if (activeRide.status == RideStatus.searching) {
           isSearchingDriver.value = true;
-          await findNearbyDriversPreview(activeRide.pickupLat, activeRide.pickupLon);
+          await findNearbyDriversPreview(
+            activeRide.pickupLat,
+            activeRide.pickupLon,
+          );
         }
       }
     } catch (e) {
@@ -92,7 +97,10 @@ class RideController extends GetxController {
   }
 
   // NOUVEAU: Prévisualisation des chauffeurs sans créer de trajet
-  Future<void> findNearbyDriversPreview(double pickupLat, double pickupLon) async {
+  Future<void> findNearbyDriversPreview(
+    double pickupLat,
+    double pickupLon,
+  ) async {
     try {
       final drivers = await SupabaseService.findNearbyDrivers(
         pickupLat: pickupLat,
@@ -101,16 +109,21 @@ class RideController extends GetxController {
         maxDrivers: 10,
       );
 
-      nearbyDrivers.value = drivers.map((driver) => DriverLocation(
-        id: driver['driver_id'],
-        driverId: driver['driver_id'],
-        lat: driver['location_lat'],
-        lon: driver['location_lon'],
-        heading: driver['heading']?.toDouble(),
-        speed: driver['speed']?.toDouble(),
-        isAvailable: true,
-        lastUpdated: DateTime.parse(driver['last_updated']),
-      )).toList();
+      nearbyDrivers.value =
+          drivers
+              .map(
+                (driver) => DriverLocation(
+                  id: driver['driver_id'],
+                  driverId: driver['driver_id'],
+                  lat: driver['location_lat'],
+                  lon: driver['location_lon'],
+                  heading: driver['heading']?.toDouble(),
+                  speed: driver['speed']?.toDouble(),
+                  isAvailable: true,
+                  lastUpdated: DateTime.parse(driver['last_updated']),
+                ),
+              )
+              .toList();
 
       print('${nearbyDrivers.length} chauffeurs trouvés pour prévisualisation');
     } catch (e) {
@@ -130,6 +143,47 @@ class RideController extends GetxController {
     DateTime? scheduledFor,
   }) async {
     try {
+      // VALIDATION PRÉALABLE
+      print('🔍 Validation préalable dans le contrôleur...');
+
+      if (pickupLat == null || pickupLat.isNaN || pickupLat.isInfinite) {
+        throw Exception(
+          'Latitude de départ invalide dans le contrôleur: $pickupLat',
+        );
+      }
+      if (pickupLon == null || pickupLon.isNaN || pickupLon.isInfinite) {
+        throw Exception(
+          'Longitude de départ invalide dans le contrôleur: $pickupLon',
+        );
+      }
+      if (destinationLat == null ||
+          destinationLat.isNaN ||
+          destinationLat.isInfinite) {
+        throw Exception(
+          'Latitude de destination invalide dans le contrôleur: $destinationLat',
+        );
+      }
+      if (destinationLon == null ||
+          destinationLon.isNaN ||
+          destinationLon.isInfinite) {
+        throw Exception(
+          'Longitude de destination invalide dans le contrôleur: $destinationLon',
+        );
+      }
+      if (pickupAddress.isEmpty || pickupAddress.trim().isEmpty) {
+        throw Exception('Adresse de départ vide dans le contrôleur');
+      }
+      if (destinationAddress.isEmpty || destinationAddress.trim().isEmpty) {
+        throw Exception('Adresse de destination vide dans le contrôleur');
+      }
+
+      print('✅ Validation du contrôleur réussie');
+      print('📍 Contrôleur - Départ: $pickupAddress ($pickupLat, $pickupLon)');
+      print(
+        '🎯 Contrôleur - Destination: $destinationAddress ($destinationLat, $destinationLon)',
+      );
+      print('💳 Contrôleur - Paiement: $paymentMethod');
+
       isLoading.value = true;
       isSearchingDriver.value = true;
 
@@ -152,19 +206,23 @@ class RideController extends GetxController {
         currentRide.value = RideModel.fromJson(rideData);
         // Ajouter à l'historique
         rideHistory.insert(0, currentRide.value!);
+        print('✅ Trajet ajouté au contrôleur avec succès');
+      } else {
+        print('⚠️ Trajet créé mais impossible de le récupérer');
+        throw Exception('Le trajet a été créé mais n\'a pas pu être récupéré');
       }
 
       // 3. Afficher le message de confirmation
       Get.snackbar(
-        'Recherche lancée', 
+        'Recherche lancée',
         '${nearbyDrivers.length} chauffeurs ont été notifiés. En attente d\'acceptation...',
         duration: const Duration(seconds: 3),
       );
 
       print('🚀 Trajet créé avec ID: $rideId');
       print('📱 ${nearbyDrivers.length} chauffeurs notifiés');
-
     } catch (e) {
+      print('❌ Erreur dans le contrôleur lors de la création du trajet: $e');
       Get.snackbar('Erreur', 'Impossible de créer le trajet: $e');
       isSearchingDriver.value = false;
       throw e; // Propager l'erreur pour que la page puisse la gérer
@@ -176,16 +234,19 @@ class RideController extends GetxController {
   // Calculer la distance entre deux points
   double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371; // Rayon de la Terre en km
-    
+
     double dLat = _degreesToRadians(lat2 - lat1);
     double dLon = _degreesToRadians(lon2 - lon1);
-    
-    double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_degreesToRadians(lat1)) * cos(_degreesToRadians(lat2)) *
-        sin(dLon / 2) * sin(dLon / 2);
-    
+
+    double a =
+        sin(dLat / 2) * sin(dLat / 2) +
+        cos(_degreesToRadians(lat1)) *
+            cos(_degreesToRadians(lat2)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
+
     double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    
+
     return earthRadius * c;
   }
 
@@ -205,7 +266,9 @@ class RideController extends GetxController {
 
   // Mettre à jour la position d'un chauffeur
   void updateDriverLocation(DriverLocation driverLocation) {
-    final index = nearbyDrivers.indexWhere((driver) => driver.driverId == driverLocation.driverId);
+    final index = nearbyDrivers.indexWhere(
+      (driver) => driver.driverId == driverLocation.driverId,
+    );
     if (index != -1) {
       nearbyDrivers[index] = driverLocation;
       print('📍 Position du chauffeur ${driverLocation.driverId} mise à jour');
@@ -218,7 +281,10 @@ class RideController extends GetxController {
   Future<void> cancelRide() async {
     if (currentRide.value != null) {
       try {
-        await RealtimeService.updateRideStatus(currentRide.value!.id, 'cancelled');
+        await RealtimeService.updateRideStatus(
+          currentRide.value!.id,
+          'cancelled',
+        );
         currentRide.value = null;
         isSearchingDriver.value = false;
         nearbyDrivers.clear();
@@ -233,7 +299,10 @@ class RideController extends GetxController {
   Future<void> startRide() async {
     if (currentRide.value != null) {
       try {
-        await RealtimeService.updateRideStatus(currentRide.value!.id, 'in_progress');
+        await RealtimeService.updateRideStatus(
+          currentRide.value!.id,
+          'in_progress',
+        );
       } catch (e) {
         Get.snackbar('Erreur', 'Impossible de démarrer le trajet: $e');
       }
@@ -244,7 +313,10 @@ class RideController extends GetxController {
   Future<void> completeRide() async {
     if (currentRide.value != null) {
       try {
-        await RealtimeService.updateRideStatus(currentRide.value!.id, 'completed');
+        await RealtimeService.updateRideStatus(
+          currentRide.value!.id,
+          'completed',
+        );
         currentRide.value = null;
         isSearchingDriver.value = false;
         nearbyDrivers.clear();

@@ -48,45 +48,80 @@ class RideModel {
   });
 
   factory RideModel.fromJson(Map<String, dynamic> json) {
-    return RideModel(
-      id: json['id'],
-      customerId: json['customer_id'],
-      driverId: json['driver_id'],
-      pickupLat: (json['pickup_latitude'] as num).toDouble(),
-      pickupLon: (json['pickup_longitude'] as num).toDouble(),
-      pickupAddress: json['pickup_address'],
-      destinationLat: (json['destination_latitude'] as num).toDouble(),
-      destinationLon: (json['destination_longitude'] as num).toDouble(),
-      destinationAddress: json['destination_address'],
-      status: RideStatus.values.firstWhere(
-        (e) => e.name == json['status'],
-        orElse: () => RideStatus.pending,
-      ),
-      fareAmount: json['fare_amount']?.toDouble(),
-      distanceKm: json['distance_km']?.toDouble(),
-      estimatedDurationMinutes: json['estimated_duration_minutes'],
-      paymentMethod: json['payment_method'] ?? 'cash',
-      notes: json['notes'],
-      scheduledFor: json['scheduled_for'] != null 
-          ? DateTime.parse(json['scheduled_for']) 
-          : null,
-      createdAt: DateTime.parse(json['created_at']),
-      acceptedAt: json['accepted_at'] != null 
-          ? DateTime.parse(json['accepted_at']) 
-          : null,
-      startedAt: json['started_at'] != null 
-          ? DateTime.parse(json['started_at']) 
-          : null,
-      completedAt: json['completed_at'] != null 
-          ? DateTime.parse(json['completed_at']) 
-          : null,
-      customer: json['customer'] != null 
-          ? UserProfile.fromJson(json['customer']) 
-          : null,
-      driver: json['driver'] != null 
-          ? UserProfile.fromJson(json['driver']) 
-          : null,
-    );
+    try {
+      print('🔍 Création du RideModel depuis JSON: $json');
+
+      // Validation des champs requis
+      if (json['id'] == null) throw Exception('ID du trajet manquant');
+      if (json['customer_id'] == null) throw Exception('ID du client manquant');
+      if (json['pickup_latitude'] == null)
+        throw Exception('Latitude de départ manquante');
+      if (json['pickup_longitude'] == null)
+        throw Exception('Longitude de départ manquante');
+      if (json['pickup_address'] == null)
+        throw Exception('Adresse de départ manquante');
+      if (json['destination_latitude'] == null)
+        throw Exception('Latitude de destination manquante');
+      if (json['destination_longitude'] == null)
+        throw Exception('Longitude de destination manquante');
+      if (json['destination_address'] == null)
+        throw Exception('Adresse de destination manquante');
+      if (json['status'] == null) throw Exception('Statut du trajet manquant');
+      if (json['payment_method'] == null)
+        throw Exception('Méthode de paiement manquante');
+      if (json['created_at'] == null)
+        throw Exception('Date de création manquante');
+
+      return RideModel(
+        id: json['id'].toString(),
+        customerId: json['customer_id'].toString(),
+        driverId: json['driver_id']?.toString(),
+        pickupLat: (json['pickup_latitude'] as num).toDouble(),
+        pickupLon: (json['pickup_longitude'] as num).toDouble(),
+        pickupAddress: json['pickup_address'].toString(),
+        destinationLat: (json['destination_latitude'] as num).toDouble(),
+        destinationLon: (json['destination_longitude'] as num).toDouble(),
+        destinationAddress: json['destination_address'].toString(),
+        status: RideStatus.values.firstWhere(
+          (e) => e.name == json['status'],
+          orElse: () => RideStatus.pending,
+        ),
+        fareAmount: json['fare_amount']?.toDouble(),
+        distanceKm: json['distance_km']?.toDouble(),
+        estimatedDurationMinutes: json['estimated_duration_minutes'],
+        paymentMethod: json['payment_method'].toString(),
+        notes: json['notes']?.toString(),
+        scheduledFor:
+            json['scheduled_for'] != null
+                ? DateTime.parse(json['scheduled_for'])
+                : null,
+        createdAt: DateTime.parse(json['created_at']),
+        acceptedAt:
+            json['accepted_at'] != null
+                ? DateTime.parse(json['accepted_at'])
+                : null,
+        startedAt:
+            json['started_at'] != null
+                ? DateTime.parse(json['started_at'])
+                : null,
+        completedAt:
+            json['completed_at'] != null
+                ? DateTime.parse(json['completed_at'])
+                : null,
+        customer:
+            json['customer'] != null
+                ? UserProfile.fromJson(json['customer'])
+                : null,
+        driver:
+            json['driver'] != null
+                ? UserProfile.fromJson(json['driver'])
+                : null,
+      );
+    } catch (e) {
+      print('❌ Erreur lors de la création du RideModel: $e');
+      print('🔍 JSON problématique: $json');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -148,20 +183,31 @@ class UserProfile {
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
-    return UserProfile(
-      id: json['id'],
-      email: json['email'],
-      fullName: json['full_name'],
-      phone: json['phone'],
-      role: UserRole.values.firstWhere(
-        (e) => e.name == json['role'],
-        orElse: () => UserRole.customer,
-      ),
-      avatarUrl: json['avatar_url'],
-      isActive: json['is_active'] ?? true,
-      isVerified: json['is_verified'] ?? false,
-      createdAt: DateTime.parse(json['created_at']),
-    );
+    try {
+      print('🔍 Création du UserProfile depuis JSON: $json');
+
+      return UserProfile(
+        id: json['id']?.toString() ?? '',
+        email: json['email']?.toString() ?? '',
+        fullName: json['full_name']?.toString() ?? '',
+        phone: json['phone']?.toString() ?? '',
+        role: UserRole.values.firstWhere(
+          (e) => e.name == json['role'],
+          orElse: () => UserRole.customer,
+        ),
+        avatarUrl: json['avatar_url']?.toString(),
+        isActive: json['is_active'] ?? true,
+        isVerified: json['is_verified'] ?? false,
+        createdAt:
+            json['created_at'] != null
+                ? DateTime.parse(json['created_at'])
+                : DateTime.now(),
+      );
+    } catch (e) {
+      print('❌ Erreur lors de la création du UserProfile: $e');
+      print('🔍 JSON problématique: $json');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -179,10 +225,7 @@ class UserProfile {
   }
 }
 
-enum UserRole {
-  customer,
-  driver,
-}
+enum UserRole { customer, driver }
 
 class DriverLocation {
   final String id;
@@ -270,9 +313,4 @@ class NotificationModel {
   }
 }
 
-enum NotificationType {
-  rideRequest,
-  rideUpdate,
-  payment,
-  general,
-}
+enum NotificationType { rideRequest, rideUpdate, payment, general }

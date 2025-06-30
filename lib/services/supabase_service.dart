@@ -89,29 +89,92 @@ class SupabaseService {
     }
 
     print('👤 Utilisateur connecté: ${user.email}');
+    print('🆔 User ID: ${user.id}');
+
+    // VALIDATION COMPLÈTE DES DONNÉES
+    print('🔍 Validation des données du trajet...');
+
+    // Validation des coordonnées de départ
+    if (pickupLat == null || pickupLat.isNaN || pickupLat.isInfinite) {
+      throw Exception('Latitude de départ invalide: $pickupLat');
+    }
+    if (pickupLon == null || pickupLon.isNaN || pickupLon.isInfinite) {
+      throw Exception('Longitude de départ invalide: $pickupLon');
+    }
+
+    // Validation des coordonnées de destination
+    if (destinationLat == null ||
+        destinationLat.isNaN ||
+        destinationLat.isInfinite) {
+      throw Exception('Latitude de destination invalide: $destinationLat');
+    }
+    if (destinationLon == null ||
+        destinationLon.isNaN ||
+        destinationLon.isInfinite) {
+      throw Exception('Longitude de destination invalide: $destinationLon');
+    }
+
+    // Validation des adresses
+    if (pickupAddress.isEmpty || pickupAddress.trim().isEmpty) {
+      throw Exception('Adresse de départ vide');
+    }
+    if (destinationAddress.isEmpty || destinationAddress.trim().isEmpty) {
+      throw Exception('Adresse de destination vide');
+    }
+
+    // Validation de la méthode de paiement
+    if (paymentMethod.isEmpty || paymentMethod.trim().isEmpty) {
+      paymentMethod = 'cash'; // Valeur par défaut
+      print(
+        '⚠️ Méthode de paiement vide, utilisation de la valeur par défaut: $paymentMethod',
+      );
+    }
+
+    // Validation des notes (optionnelles)
+    if (notes != null && notes.trim().isEmpty) {
+      notes = null;
+      print('⚠️ Notes vides, définies à null');
+    }
+
+    // Validation de la date programmée (optionnelle)
+    if (scheduledFor != null && scheduledFor.isBefore(DateTime.now())) {
+      throw Exception('La date programmée ne peut pas être dans le passé');
+    }
+
+    print('✅ Validation des données réussie');
+    print('📍 Départ: $pickupAddress ($pickupLat, $pickupLon)');
+    print(
+      '🎯 Destination: $destinationAddress ($destinationLat, $destinationLon)',
+    );
+    print('💳 Paiement: $paymentMethod');
+    print('📝 Notes: ${notes ?? "Aucune"}');
+    print(
+      '📅 Programmé pour: ${scheduledFor?.toIso8601String() ?? "Immédiat"}',
+    );
 
     try {
       print('📝 Création du trajet dans la base de données...');
 
+      // Préparer les données pour l'insertion
+      final rideData = {
+        'customer_id': user.id,
+        'pickup_latitude': pickupLat,
+        'pickup_longitude': pickupLon,
+        'pickup_address': pickupAddress.trim(),
+        'destination_latitude': destinationLat,
+        'destination_longitude': destinationLon,
+        'destination_address': destinationAddress.trim(),
+        'status': 'searching',
+        'payment_method': paymentMethod.trim(),
+        'notes': notes?.trim(),
+        'scheduled_for': scheduledFor?.toIso8601String(),
+      };
+
+      print('📊 Données à insérer: $rideData');
+
       // Créer d'abord le trajet
       final rideResponse =
-          await _client
-              .from('rides')
-              .insert({
-                'customer_id': user.id,
-                'pickup_latitude': pickupLat,
-                'pickup_longitude': pickupLon,
-                'pickup_address': pickupAddress,
-                'destination_latitude': destinationLat,
-                'destination_longitude': destinationLon,
-                'destination_address': destinationAddress,
-                'status': 'searching',
-                'payment_method': paymentMethod,
-                'notes': notes,
-                'scheduled_for': scheduledFor?.toIso8601String(),
-              })
-              .select('id')
-              .single();
+          await _client.from('rides').insert(rideData).select('id').single();
 
       final rideId = rideResponse['id'] as String;
       print('✅ Trajet créé avec ID: $rideId');
@@ -164,7 +227,17 @@ class SupabaseService {
           .from('rides')
           .select('''
             *,
-            driver:profiles!rides_driver_id_fkey(full_name, phone)
+            driver:profiles!rides_driver_id_fkey(
+              id,
+              email,
+              full_name,
+              phone,
+              role,
+              avatar_url,
+              is_active,
+              is_verified,
+              created_at
+            )
           ''')
           .eq('customer_id', user.id)
           .order('created_at', ascending: false);
@@ -178,20 +251,43 @@ class SupabaseService {
 
   static Future<Map<String, dynamic>?> getRideById(String rideId) async {
     try {
+      print('🔍 Récupération du trajet avec ID: $rideId');
+
       final response =
           await _client
               .from('rides')
               .select('''
             *,
-            customer:profiles!rides_customer_id_fkey(full_name, phone),
-            driver:profiles!rides_driver_id_fkey(full_name, phone)
+            customer:profiles!rides_customer_id_fkey(
+              id,
+              email,
+              full_name,
+              phone,
+              role,
+              avatar_url,
+              is_active,
+              is_verified,
+              created_at
+            ),
+            driver:profiles!rides_driver_id_fkey(
+              id,
+              email,
+              full_name,
+              phone,
+              role,
+              avatar_url,
+              is_active,
+              is_verified,
+              created_at
+            )
           ''')
               .eq('id', rideId)
               .single();
 
+      print('✅ Trajet récupéré: $response');
       return response;
     } catch (e) {
-      print('Erreur lors de la récupération du trajet: $e');
+      print('❌ Erreur lors de la récupération du trajet: $e');
       return null;
     }
   }
