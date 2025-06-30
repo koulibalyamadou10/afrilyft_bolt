@@ -125,8 +125,26 @@ class SupabaseService {
     
     return response;
   }
+
+  // NOUVEAU: Fonction pour récupérer un trajet par ID de demande
+  static Future<Map<String, dynamic>?> getRideByRequestId(String requestId) async {
+    final response = await _client
+        .from('ride_requests')
+        .select('''
+          ride_id,
+          rides!inner(
+            *,
+            customer:profiles!rides_customer_id_fkey(full_name, phone),
+            driver:profiles!rides_driver_id_fkey(full_name, phone)
+          )
+        ''')
+        .eq('id', requestId)
+        .single();
+    
+    return response['rides'];
+  }
   
-  // Recherche de chauffeurs
+  // Recherche de chauffeurs (AMÉLIORÉE - exclut ceux en course)
   static Future<List<Map<String, dynamic>>> findNearbyDrivers({
     required double pickupLat,
     required double pickupLon,
@@ -141,6 +159,78 @@ class SupabaseService {
     });
     
     return List<Map<String, dynamic>>.from(response);
+  }
+
+  // NOUVEAU: Fonctions pour l'app chauffeur
+  static Future<List<Map<String, dynamic>>> getDriverRideRequests() async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('User not authenticated');
+    
+    final response = await _client
+        .from('ride_requests')
+        .select('''
+          *,
+          rides!inner(
+            *,
+            customer:profiles!rides_customer_id_fkey(full_name, phone)
+          )
+        ''')
+        .eq('driver_id', user.id)
+        .eq('status', 'sent')
+        .gt('expires_at', DateTime.now().toIso8601String())
+        .order('sent_at', ascending: false);
+    
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<bool> acceptRideRequest(String requestId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('User not authenticated');
+
+    // Récupérer les détails de la demande
+    final requestData = await _client
+        .from('ride_requests')
+        .select('ride_id')
+        .eq('id', requestId)
+        .eq('driver_id', user.id)
+        .single();
+
+    final rideId = requestData['ride_id'];
+
+    // Utiliser la fonction accept_ride
+    final result = await _client.rpc('accept_ride', params: {
+      'p_ride_id': rideId,
+      'p_driver_id': user.id,
+    });
+    
+    return result as bool;
+  }
+
+  static Future<void> declineRideRequest(String requestId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('User not authenticated');
+
+    await _client
+        .from('ride_requests')
+        .update({
+          'status': 'declined',
+          'responded_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', requestId)
+        .eq('driver_id', user.id);
+  }
+
+  static Future<void> updateDriverAvailability(bool isAvailable) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('User not authenticated');
+
+    await _client
+        .from('driver_locations')
+        .upsert({
+          'driver_id': user.id,
+          'is_available': isAvailable,
+          'last_updated': DateTime.now().toIso8601String(),
+        });
   }
   
   // Géolocalisation

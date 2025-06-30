@@ -162,6 +162,11 @@ class RealtimeService {
               
               // Afficher une notification selon le statut
               _showRideStatusNotification(ride);
+              
+              // IMPORTANT: Si accepté, arrêter la recherche
+              if (ride.status == RideStatus.accepted) {
+                rideController.isSearchingDriver.value = false;
+              }
             }
             
             // Mettre à jour l'historique
@@ -289,12 +294,6 @@ class RealtimeService {
     }
   }
 
-  // NOUVEAU: Fonction pour s'abonner aux mises à jour de trajets
-  static void subscribeToRideUpdates(Function(Map<String, dynamic>) onRideUpdate) {
-    // Cette fonction sera appelée par le RideController
-    // pour écouter spécifiquement les mises à jour de trajets
-  }
-
   // Envoyer la position du chauffeur (pour l'app chauffeur)
   static Future<void> updateDriverLocation({
     required double latitude,
@@ -309,13 +308,14 @@ class RealtimeService {
       
       if (userId == null || !authController.isDriver) return;
 
-      await _client.rpc('update_driver_location', params: {
-        'p_driver_id': userId,
-        'p_latitude': latitude,
-        'p_longitude': longitude,
-        'p_heading': heading,
-        'p_speed': speed,
-        'p_is_available': isAvailable,
+      await _client.from('driver_locations').upsert({
+        'driver_id': userId,
+        'latitude': latitude,
+        'longitude': longitude,
+        'heading': heading,
+        'speed': speed,
+        'is_available': isAvailable,
+        'last_updated': DateTime.now().toIso8601String(),
       });
       
       print('📍 Position mise à jour: $latitude, $longitude');
@@ -325,7 +325,7 @@ class RealtimeService {
   }
 
   // Accepter un trajet (pour l'app chauffeur)
-  static Future<bool> acceptRide(String rideId) async {
+  static Future<bool> acceptRide(String requestId) async {
     try {
       final authController = Get.find<AuthController>();
       final userId = authController.user.value?.id;
@@ -333,7 +333,7 @@ class RealtimeService {
       if (userId == null || !authController.isDriver) return false;
 
       final result = await _client.rpc('accept_ride', params: {
-        'p_ride_id': rideId,
+        'p_request_id': requestId,
         'p_driver_id': userId,
       });
       
@@ -363,5 +363,11 @@ class RealtimeService {
       print('❌ Erreur lors de la mise à jour du statut: $e');
       return false;
     }
+  }
+
+  // NOUVEAU: Fonction pour s'abonner aux mises à jour de trajets
+  static void subscribeToRideUpdates(Function(Map<String, dynamic>) onRideUpdate) {
+    // Cette fonction sera appelée par le RideController
+    // pour écouter spécifiquement les mises à jour de trajets
   }
 }
