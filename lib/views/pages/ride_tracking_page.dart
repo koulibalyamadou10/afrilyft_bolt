@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../controllers/ride_controller.dart';
 import '../../models/ride_model.dart';
 import '../../theme/app_colors.dart';
+import '../../config/maps_config.dart';
 
 class RideTrackingPage extends StatefulWidget {
   const RideTrackingPage({Key? key}) : super(key: key);
@@ -17,6 +20,12 @@ class _RideTrackingPageState extends State<RideTrackingPage>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
+  GoogleMapController? _mapController;
+  Set<Marker> _markers = {};
+  Set<Polyline> _polylines = {};
+  Position? _currentPosition;
+  bool _isLoadingLocation = true;
+
   @override
   void initState() {
     super.initState();
@@ -27,12 +36,155 @@ class _RideTrackingPageState extends State<RideTrackingPage>
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    _getCurrentLocation();
+    _initializeMap();
+
+    // Écouter les changements de chauffeurs
+    ever(rideController.nearbyDrivers, (_) {
+      _addDriverMarkers();
+    });
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _mapController?.dispose();
     super.dispose();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      setState(() {
+        _isLoadingLocation = true;
+      });
+
+      print('🔍 Obtention de la position actuelle...');
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      print('✅ Position obtenue: ${position.latitude}, ${position.longitude}');
+
+      setState(() {
+        _currentPosition = position;
+        _isLoadingLocation = false;
+      });
+
+      // Centrer immédiatement la carte sur la position actuelle
+      _updateMapWithCurrentLocation();
+    } catch (e) {
+      print('❌ Erreur lors de l\'obtention de la position: $e');
+      setState(() {
+        _isLoadingLocation = false;
+      });
+
+      // En cas d'erreur, centrer sur Conakry par défaut
+      if (_mapController != null) {
+        _mapController!.animateCamera(
+          CameraUpdate.newLatLngZoom(
+            const LatLng(9.5370, -13.6785), // Conakry
+            12,
+          ),
+        );
+      }
+    }
+  }
+
+  void _initializeMap() {
+    final ride = rideController.currentRide.value;
+    if (ride == null) return;
+
+    // Marqueur de départ
+    _markers.add(
+      Marker(
+        markerId: const MarkerId('pickup'),
+        position: LatLng(ride.pickupLat, ride.pickupLon),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: InfoWindow(
+          title: 'Point de départ',
+          snippet: ride.pickupAddress,
+        ),
+      ),
+    );
+
+    // Marqueur de destination
+    _markers.add(
+      Marker(
+        markerId: const MarkerId('destination'),
+        position: LatLng(ride.destinationLat, ride.destinationLon),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        infoWindow: InfoWindow(
+          title: 'Destination',
+          snippet: ride.destinationAddress,
+        ),
+      ),
+    );
+
+    // Ligne de trajet
+    _polylines.add(
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: [
+          LatLng(ride.pickupLat, ride.pickupLon),
+          LatLng(ride.destinationLat, ride.destinationLon),
+        ],
+        color: AppColors.primary,
+        width: 3,
+      ),
+    );
+  }
+
+  void _updateMapWithCurrentLocation() {
+    if (_currentPosition == null || _mapController == null) return;
+
+    final currentLatLng = LatLng(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+    );
+
+    // Ajouter ou mettre à jour le marqueur de position actuelle
+    _markers.removeWhere(
+      (marker) => marker.markerId.value == 'current_location',
+    );
+    _markers.add(
+      Marker(
+        markerId: const MarkerId('current_location'),
+        position: currentLatLng,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+        infoWindow: const InfoWindow(
+          title: 'Votre position',
+          snippet: 'Position actuelle',
+        ),
+      ),
+    );
+
+    // Centrer la carte sur la position actuelle avec animation
+    _mapController!.animateCamera(
+      CameraUpdate.newLatLngZoom(currentLatLng, 16), // Zoom plus proche
+    );
+
+    print(
+      '📍 Carte centrée sur la position actuelle: ${_currentPosition!.latitude}, ${_currentPosition!.longitude}',
+    );
+  }
+
+  void _onMapCreated(GoogleMapController controller) {
+    _mapController = controller;
+
+    // Toujours centrer sur la position actuelle si disponible
+    if (_currentPosition != null) {
+      _updateMapWithCurrentLocation();
+    } else {
+      // Si pas encore de position, attendre et centrer dès qu'elle est disponible
+      _getCurrentLocation().then((_) {
+        if (_currentPosition != null) {
+          _updateMapWithCurrentLocation();
+        }
+      });
+    }
   }
 
   @override
@@ -52,88 +204,48 @@ class _RideTrackingPageState extends State<RideTrackingPage>
 
         return Stack(
           children: [
-            // Carte (simulée avec animation)
-            Container(
-              color: Colors.grey[300],
-              child: Stack(
-                children: [
-                  // Fond de carte
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+            // Carte Google Maps
+            _buildMapWidget(),
+
+            // Indicateur de chargement de position
+            if (_isLoadingLocation)
+              Positioned(
+                top: 100,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.map,
-                          size: 100,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Carte interactive',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.primary,
+                            ),
+                            strokeWidth: 2,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(width: 8),
                         Text(
-                          'Suivi en temps réel',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
+                          'Localisation en cours...',
+                          style: TextStyle(color: Colors.white, fontSize: 14),
                         ),
                       ],
                     ),
                   ),
-
-                  // Chauffeurs à proximité avec animation
-                  if (rideController.isSearchingDriver.value)
-                    ...rideController.nearbyDrivers.map((driver) => Positioned(
-                      top: 200 + (driver.lat * 10).toInt() % 200,
-                      left: 100 + (driver.lon * 10).toInt() % 200,
-                      child: AnimatedBuilder(
-                        animation: _pulseAnimation,
-                        builder: (context, child) => Transform.scale(
-                          scale: _pulseAnimation.value,
-                          child: _buildDriverMarker(isSearching: true),
-                        ),
-                      ),
-                    )),
-
-                  // Chauffeur assigné (si accepté)
-                  if (ride.status == RideStatus.accepted || ride.status == RideStatus.inProgress)
-                    Positioned(
-                      top: 250,
-                      left: 150,
-                      child: _buildDriverMarker(isAssigned: true),
-                    ),
-
-                  // Position du client
-                  Positioned(
-                    bottom: 300,
-                    right: 180,
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 6,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
 
             // En-tête
             Positioned(
@@ -141,7 +253,12 @@ class _RideTrackingPageState extends State<RideTrackingPage>
               left: 0,
               right: 0,
               child: Container(
-                padding: const EdgeInsets.only(top: 50, left: 16, right: 16, bottom: 16),
+                padding: const EdgeInsets.only(
+                  top: 50,
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.secondary.withOpacity(0.9),
                 ),
@@ -189,13 +306,28 @@ class _RideTrackingPageState extends State<RideTrackingPage>
                 child: _buildRideInfo(ride),
               ),
             ),
+
+            // Bouton de localisation
+            if (_currentPosition != null)
+              Positioned(
+                bottom: 200,
+                right: 16,
+                child: FloatingActionButton(
+                  onPressed: _updateMapWithCurrentLocation,
+                  backgroundColor: AppColors.primary,
+                  child: const Icon(Icons.my_location, color: Colors.white),
+                ),
+              ),
           ],
         );
       }),
     );
   }
 
-  Widget _buildDriverMarker({bool isSearching = false, bool isAssigned = false}) {
+  Widget _buildDriverMarker({
+    bool isSearching = false,
+    bool isAssigned = false,
+  }) {
     Color markerColor = AppColors.primary;
     if (isAssigned) markerColor = Colors.green;
     if (isSearching) markerColor = Colors.orange;
@@ -215,11 +347,7 @@ class _RideTrackingPageState extends State<RideTrackingPage>
           ),
         ],
       ),
-      child: const Icon(
-        Icons.directions_car,
-        color: Colors.white,
-        size: 20,
-      ),
+      child: const Icon(Icons.directions_car, color: Colors.white, size: 20),
     );
   }
 
@@ -335,10 +463,7 @@ class _RideTrackingPageState extends State<RideTrackingPage>
         Expanded(
           child: Text(
             address,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
           ),
         ),
       ],
@@ -352,18 +477,9 @@ class _RideTrackingPageState extends State<RideTrackingPage>
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
       ],
     );
   }
@@ -403,10 +519,7 @@ class _RideTrackingPageState extends State<RideTrackingPage>
                 ),
                 Text(
                   driver.phone,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -433,53 +546,48 @@ class _RideTrackingPageState extends State<RideTrackingPage>
   }
 
   Widget _buildSearchingInfo() {
-    return Obx(() => Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+    return Obx(
+      () => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Recherche d\'un chauffeur...',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                const SizedBox(width: 12),
+                const Text(
+                  'Recherche d\'un chauffeur...',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${rideController.nearbyDrivers.length} chauffeurs notifiés',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Les chauffeurs ont 2 minutes pour répondre',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[500],
+            const SizedBox(height: 8),
+            Text(
+              '${rideController.nearbyDrivers.length} chauffeurs notifiés',
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              'Les chauffeurs ont 2 minutes pour répondre',
+              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+            ),
+          ],
+        ),
       ),
-    ));
+    );
   }
 
   String _getStatusTitle(RideStatus status) {
@@ -514,10 +622,7 @@ class _RideTrackingPageState extends State<RideTrackingPage>
         title: const Text('Annuler le trajet'),
         content: const Text('Êtes-vous sûr de vouloir annuler ce trajet ?'),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Non'),
-          ),
+          TextButton(onPressed: () => Get.back(), child: const Text('Non')),
           TextButton(
             onPressed: () {
               Get.back();
@@ -532,5 +637,68 @@ class _RideTrackingPageState extends State<RideTrackingPage>
         ],
       ),
     );
+  }
+
+  Widget _buildMapWidget() {
+    final ride = rideController.currentRide.value;
+    if (ride == null) {
+      return Container(
+        color: Colors.grey[300],
+        child: const Center(child: Text('Aucun trajet en cours')),
+      );
+    }
+
+    // Position initiale de la carte - toujours centrée sur la position actuelle
+    LatLng initialPosition;
+    if (_currentPosition != null) {
+      initialPosition = LatLng(
+        _currentPosition!.latitude,
+        _currentPosition!.longitude,
+      );
+    } else {
+      // Position par défaut en Guinée (Conakry) en attendant la géolocalisation
+      initialPosition = const LatLng(9.5370, -13.6785);
+    }
+
+    return GoogleMap(
+      initialCameraPosition: CameraPosition(
+        target: initialPosition,
+        zoom: 16, // Zoom plus proche pour voir la position actuelle
+      ),
+      onMapCreated: _onMapCreated,
+      myLocationEnabled: false,
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
+      markers: _markers,
+      polylines: _polylines,
+    );
+  }
+
+  // Méthode pour ajouter les marqueurs des chauffeurs
+  void _addDriverMarkers() {
+    if (!rideController.isSearchingDriver.value) return;
+
+    // Supprimer les anciens marqueurs de chauffeurs
+    _markers.removeWhere(
+      (marker) => marker.markerId.value.startsWith('driver_'),
+    );
+
+    // Ajouter les nouveaux marqueurs
+    for (final driver in rideController.nearbyDrivers) {
+      _markers.add(
+        Marker(
+          markerId: MarkerId('driver_${driver.id}'),
+          position: LatLng(driver.lat, driver.lon),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueOrange,
+          ),
+          infoWindow: InfoWindow(
+            title: 'Chauffeur disponible',
+            snippet: 'ID: ${driver.driverId}',
+          ),
+        ),
+      );
+    }
   }
 }
