@@ -3,9 +3,8 @@ import 'package:geolocator/geolocator.dart';
 import '../models/ride_model.dart';
 import '../services/supabase_service.dart';
 import '../services/realtime_service.dart';
-import '../services/notification_service.dart';
-import 'auth_controller.dart';
 import 'dart:math';
+import 'package:flutter/material.dart';   
 
 class RideController extends GetxController {
   final Rx<RideModel?> currentRide = Rx<RideModel?>(null);

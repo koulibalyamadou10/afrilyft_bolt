@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "505307546033",
+    "project_id": "afrilyft-eeb6b",
+    "storage_bucket": "afrilyft-eeb6b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:505307546033:android:fb510f7008887ac5dfbd90",
+        "android_client_info": {
+          "package_name": "com.bratech.afrilyft"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCf2CYlQeEJvQ93bfUx2lXordr4dwB-Bkc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:505307546033:android:0eb40872531a5cbcdfbd90",
+        "android_client_info": {
+          "package_name": "com.example.afrilyft"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCf2CYlQeEJvQ93bfUx2lXordr4dwB-Bkc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:505307546033:android:f960df39cca18816dfbd90",
+        "android_client_info": {
+          "package_name": "com.example.afrilyft_driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCf2CYlQeEJvQ93bfUx2lXordr4dwB-Bkc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -183,6 +183,10 @@ class RealtimeService {
             }
           }
           break;
+        default:
+          // Gérer les autres types d'événements si nécessaire
+          print('📨 Événement de trajet non géré: ${payload.eventType}');
+          break;
       }
     } catch (e) {
       print('❌ Erreur lors du traitement du changement de trajet: $e');

@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:firebase_core/firebase_core.dart';
+// import 'package:firebase_core/firebase_core.dart';
 import 'views/pages/splash_screen.dart';
 import 'theme/app_theme.dart';
 import 'controllers/auth_controller.dart';
 import 'services/realtime_service.dart';
-import 'services/notification_service.dart';
+// import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Initialiser Firebase
-  await Firebase.initializeApp();
+  // await Firebase.initializeApp();
   
   // Initialiser Supabase avec vos credentials
   await Supabase.initialize(
@@ -21,7 +22,7 @@ void main() async {
   );
   
   // Initialiser les notifications
-  await NotificationService.initialize();
+  // await NotificationService.initialize();
   
   // Initialiser les contrôleurs globaux
   Get.put(AuthController());
@@ -34,6 +35,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Demander les permissions de localisation
+    requestLocationPermission();
+
     return GetMaterialApp(
       title: 'AfriLyft',
       debugShowCheckedModeBanner: false,
@@ -46,5 +50,13 @@ class MyApp extends StatelessWidget {
         });
       },
     );
+  }
+}
+
+// Ecrire la fonction qui permet de demander les permissions de localisation et de l'appeler dans le main
+Future<void> requestLocationPermission() async {
+  final status = await Geolocator.requestPermission();
+  if (status == LocationPermission.denied) {
+    throw Exception('Location permission denied');
   }
 }

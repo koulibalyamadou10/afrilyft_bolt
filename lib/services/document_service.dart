@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/document_model.dart';
 
@@ -21,7 +23,7 @@ class DocumentService {
       
       await _client.storage
           .from('driver-documents')
-          .upload(storagePath, filePath);
+          .upload(storagePath, File(filePath));
 
       // Get public URL
       final documentUrl = _client.storage

@@ -13,6 +13,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true // ✅ Ajoute ceci
     }
 
     kotlinOptions {
@@ -41,4 +42,15 @@ android {
 
 flutter {
     source = "../.."
+}
+
+configurations.all {
+    resolutionStrategy {
+        force("com.google.firebase:firebase-iid:21.1.0")
+    }
+}
+
+// Ajouter ceci
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") // ✅ Ajoute cette ligne
 }

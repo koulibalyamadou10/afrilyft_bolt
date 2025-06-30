@@ -1,3 +1,4 @@
+import 'package:afrilyft/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../models/ride_model.dart';
