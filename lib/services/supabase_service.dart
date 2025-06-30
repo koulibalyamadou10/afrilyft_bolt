@@ -96,20 +96,42 @@ class SupabaseService {
     if (user == null) throw Exception('User not authenticated');
     
     try {
-      final response = await _client.rpc('create_ride_and_notify_drivers', params: {
-        'p_customer_id': user.id,
-        'p_pickup_lat': pickupLat,
-        'p_pickup_lon': pickupLon,
-        'p_pickup_address': pickupAddress,
-        'p_destination_lat': destinationLat,
-        'p_destination_lon': destinationLon,
-        'p_destination_address': destinationAddress,
-        'p_payment_method': paymentMethod,
-        'p_notes': notes,
-        'p_scheduled_for': scheduledFor?.toIso8601String(),
+      // Créer d'abord le trajet
+      final rideResponse = await _client
+          .from('rides')
+          .insert({
+            'customer_id': user.id,
+            'pickup_latitude': pickupLat,
+            'pickup_longitude': pickupLon,
+            'pickup_address': pickupAddress,
+            'destination_latitude': destinationLat,
+            'destination_longitude': destinationLon,
+            'destination_address': destinationAddress,
+            'status': 'searching',
+            'payment_method': paymentMethod,
+            'notes': notes,
+            'scheduled_for': scheduledFor?.toIso8601String(),
+          })
+          .select('id')
+          .single();
+      
+      final rideId = rideResponse['id'] as String;
+      
+      // Appeler la fonction Edge pour trouver des chauffeurs à proximité
+      final response = await _client.functions.invoke('ride-matching', {
+        body: {
+          rideId: rideId,
+          pickupLat: pickupLat,
+          pickupLng: pickupLon,
+          maxDistance: 5.0,
+        },
       });
       
-      return response as String;
+      if (response.error) {
+        throw Exception('Erreur lors de la recherche de chauffeurs: ${response.error?.message}');
+      }
+      
+      return rideId;
     } catch (e) {
       print('Erreur lors de la création du trajet: $e');
       rethrow;
@@ -330,5 +352,29 @@ class SupabaseService {
       endLatitude,
       endLongitude,
     ) / 1000; // Retourne en kilomètres
+  }
+
+  // Envoyer une notification
+  static Future<void> sendNotification({
+    required String userId,
+    required String title,
+    required String message,
+    required String type,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      await _client.functions.invoke('notifications', {
+        body: {
+          userId: userId,
+          title: title,
+          message: message,
+          type: type,
+          data: data,
+        },
+      });
+    } catch (e) {
+      print('Erreur lors de l\'envoi de notification: $e');
+      rethrow;
+    }
   }
 }

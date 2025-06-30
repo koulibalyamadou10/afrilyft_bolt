@@ -1,11 +1,11 @@
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/supabase_service.dart';
 import '../models/ride_model.dart';
 import '../views/home_view.dart';
 import '../views/pages/login_page.dart';
 import '../views/pages/onboarding_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthController extends GetxController {
   final Rx<User?> user = Rx<User?>(null);
@@ -69,7 +69,7 @@ class AuthController extends GetxController {
       final profile = await SupabaseService.getCurrentUserProfile();
       if (profile != null) {
         userProfile.value = UserProfile.fromJson(profile);
-
+        
         // Navigate to home view after profile is loaded
         Get.offAll(() => const HomeView());
       }
