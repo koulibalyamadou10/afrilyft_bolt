@@ -1,8 +1,8 @@
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../theme/app_colors.dart';
+import '../../controllers/auth_controller.dart';
 import 'onboarding_page.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -16,6 +16,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  final AuthController _authController = Get.find<AuthController>();
 
   @override
   void initState() {
@@ -44,10 +45,26 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     // Démarrer l'animation
     _animationController.forward();
     
-    // Navigation vers la page d'accueil après un délai
+    // Navigation vers la page appropriée après un délai
     Future.delayed(const Duration(seconds: 3), () {
-      Get.off(() => const OnboardingPage(), transition: Transition.fadeIn);
+      _navigateToNextScreen();
     });
+  }
+
+  void _navigateToNextScreen() {
+    // If user is authenticated, go to home
+    if (_authController.isAuthenticated.value) {
+      // No need to navigate, auth controller will handle it
+      return;
+    }
+    
+    // If user has seen onboarding, go to login
+    if (_authController.hasSeenOnboarding.value) {
+      Get.off(() => const LoginPage(), transition: Transition.fadeIn);
+    } else {
+      // Otherwise, go to onboarding
+      Get.off(() => const OnboardingPage(), transition: Transition.fadeIn);
+    }
   }
 
   @override
@@ -122,9 +139,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           ),
           
           // Indicateur de chargement en bas de la page
-          Padding(
-            padding: const EdgeInsets.only(bottom: 50.0),
-            child: const SizedBox(
+          const Padding(
+            padding: EdgeInsets.only(bottom: 50.0),
+            child: SizedBox(
               width: 40,
               height: 40,
               child: CircularProgressIndicator(
@@ -137,4 +154,4 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       ),
     );
   }
-} 
+}

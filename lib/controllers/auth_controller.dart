@@ -4,17 +4,32 @@ import '../services/supabase_service.dart';
 import '../models/ride_model.dart';
 import '../views/home_view.dart';
 import '../views/pages/login_page.dart';
+import '../views/pages/onboarding_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthController extends GetxController {
   final Rx<User?> user = Rx<User?>(null);
   final Rx<UserProfile?> userProfile = Rx<UserProfile?>(null);
   final RxBool isLoading = false.obs;
   final RxBool isAuthenticated = false.obs;
+  final RxBool hasSeenOnboarding = false.obs;
 
   @override
   void onInit() {
     super.onInit();
     _initAuth();
+    _checkOnboardingStatus();
+  }
+
+  Future<void> _checkOnboardingStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    hasSeenOnboarding.value = prefs.getBool('hasSeenOnboarding') ?? false;
+  }
+
+  Future<void> setOnboardingComplete() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasSeenOnboarding', true);
+    hasSeenOnboarding.value = true;
   }
 
   void _initAuth() {
@@ -54,6 +69,9 @@ class AuthController extends GetxController {
       final profile = await SupabaseService.getCurrentUserProfile();
       if (profile != null) {
         userProfile.value = UserProfile.fromJson(profile);
+        
+        // Navigate to home after profile is loaded
+        Get.offAll(() => const HomeView());
       }
     } catch (e) {
       print('Erreur lors du chargement du profil: $e');
@@ -113,7 +131,7 @@ class AuthController extends GetxController {
       );
 
       if (response.user != null) {
-        Get.offAll(() => const HomeView());
+        // Profile will be loaded automatically via _loadUserProfile
         return true;
       } else {
         Get.snackbar(
@@ -132,9 +150,12 @@ class AuthController extends GetxController {
 
   Future<void> signOut() async {
     try {
+      isLoading.value = true;
       await SupabaseService.signOut();
+      isLoading.value = false;
     } catch (e) {
       Get.snackbar('Erreur', 'Erreur lors de la déconnexion: $e');
+      isLoading.value = false;
     }
   }
 

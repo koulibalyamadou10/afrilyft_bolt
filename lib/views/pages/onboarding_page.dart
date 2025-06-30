@@ -1,11 +1,10 @@
-import 'package:afrilyft/views/pages/home_page.dart';
-import 'package:afrilyft/views/pages/login_page.dart' show LoginPage;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../models/onboarding_model.dart';
 import '../../theme/app_colors.dart';
-import '../home_view.dart';
+import '../../controllers/auth_controller.dart';
+import 'login_page.dart';
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key});
@@ -16,6 +15,7 @@ class OnboardingPage extends StatefulWidget {
 
 class _OnboardingPageState extends State<OnboardingPage> {
   final PageController _pageController = PageController();
+  final AuthController _authController = Get.find<AuthController>();
   int _currentPage = 0;
 
   @override
@@ -37,7 +37,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: TextButton(
-                  onPressed: () => _goToHomePage(),
+                  onPressed: () => _goToLoginPage(),
                   child: const Text(
                     'Passer',
                     style: TextStyle(
@@ -83,7 +83,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   ElevatedButton(
                     onPressed: () {
                       if (_currentPage == onboardingPages.length - 1) {
-                        _goToHomePage();
+                        _goToLoginPage();
                       } else {
                         _pageController.nextPage(
                           duration: const Duration(milliseconds: 300),
@@ -174,7 +174,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
     );
   }
 
-  void _goToHomePage() {
+  void _goToLoginPage() {
+    // Mark onboarding as completed
+    _authController.setOnboardingComplete();
     Get.offAll(() => const LoginPage(), transition: Transition.fadeIn);
   }
-} 
+}

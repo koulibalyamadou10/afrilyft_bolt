@@ -27,19 +27,122 @@ class _CreateRidePageState extends State<CreateRidePage> {
   
   bool _isLoadingPickup = false;
   bool _isLoadingDestination = false;
+  
+  List<String> _pickupSuggestions = [];
+  List<String> _destinationSuggestions = [];
+  
+  final FocusNode _pickupFocusNode = FocusNode();
+  final FocusNode _destinationFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _getCurrentLocationAsPickup();
+    
+    // Add listeners to text controllers for suggestions
+    _pickupController.addListener(_onPickupTextChanged);
+    _destinationController.addListener(_onDestinationTextChanged);
+    
+    // Add listeners to focus nodes
+    _pickupFocusNode.addListener(() {
+      if (!_pickupFocusNode.hasFocus) {
+        setState(() {
+          _pickupSuggestions = [];
+        });
+      }
+    });
+    
+    _destinationFocusNode.addListener(() {
+      if (!_destinationFocusNode.hasFocus) {
+        setState(() {
+          _destinationSuggestions = [];
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _pickupController.removeListener(_onPickupTextChanged);
+    _destinationController.removeListener(_onDestinationTextChanged);
     _pickupController.dispose();
     _destinationController.dispose();
     _notesController.dispose();
+    _pickupFocusNode.dispose();
+    _destinationFocusNode.dispose();
     super.dispose();
+  }
+
+  void _onPickupTextChanged() {
+    if (_pickupController.text.length > 2) {
+      _getAddressSuggestions(_pickupController.text, true);
+    } else {
+      setState(() {
+        _pickupSuggestions = [];
+      });
+    }
+  }
+
+  void _onDestinationTextChanged() {
+    if (_destinationController.text.length > 2) {
+      _getAddressSuggestions(_destinationController.text, false);
+    } else {
+      setState(() {
+        _destinationSuggestions = [];
+      });
+    }
+  }
+
+  Future<void> _getAddressSuggestions(String query, bool isPickup) async {
+    if (query.isEmpty) return;
+    
+    // Simulate network delay
+    await Future.delayed(const Duration(milliseconds: 300));
+    
+    // Mock suggestions based on query
+    List<String> suggestions = [];
+    
+    if (query.toLowerCase().contains('con')) {
+      suggestions.add('Conakry, Guinea');
+      suggestions.add('Conakry International Airport, Guinea');
+      suggestions.add('Conakry Port, Guinea');
+    }
+    
+    if (query.toLowerCase().contains('kin')) {
+      suggestions.add('Kindia, Guinea');
+      suggestions.add('Kindia Market, Guinea');
+      suggestions.add('Kindia Central Station, Guinea');
+    }
+    
+    if (query.toLowerCase().contains('mam')) {
+      suggestions.add('Mamou, Guinea');
+      suggestions.add('Mamou Central, Guinea');
+    }
+    
+    if (query.toLowerCase().contains('lab')) {
+      suggestions.add('Labé, Guinea');
+      suggestions.add('Labé Market, Guinea');
+    }
+    
+    if (query.toLowerCase().contains('kan')) {
+      suggestions.add('Kankan, Guinea');
+      suggestions.add('Kankan University, Guinea');
+    }
+    
+    // Add generic suggestions if no specific matches
+    if (suggestions.isEmpty && query.length > 2) {
+      suggestions.add('$query Street, Guinea');
+      suggestions.add('$query Market, Guinea');
+      suggestions.add('$query District, Guinea');
+    }
+    
+    setState(() {
+      if (isPickup) {
+        _pickupSuggestions = suggestions;
+      } else {
+        _destinationSuggestions = suggestions;
+      }
+    });
   }
 
   Future<void> _getCurrentLocationAsPickup() async {
@@ -105,10 +208,24 @@ class _CreateRidePageState extends State<CreateRidePage> {
       setState(() {
         if (isPickup) {
           _isLoadingPickup = false;
+          _pickupSuggestions = [];
         } else {
           _isLoadingDestination = false;
+          _destinationSuggestions = [];
         }
       });
+    }
+  }
+
+  void _selectSuggestion(String suggestion, bool isPickup) {
+    if (isPickup) {
+      _pickupController.text = suggestion;
+      _pickupSuggestions = [];
+      _searchLocation(suggestion, true);
+    } else {
+      _destinationController.text = suggestion;
+      _destinationSuggestions = [];
+      _searchLocation(suggestion, false);
     }
   }
 
@@ -120,11 +237,23 @@ class _CreateRidePageState extends State<CreateRidePage> {
 
     if (_pickupLat == null || _pickupLon == null || 
         _destinationLat == null || _destinationLon == null) {
-      Get.snackbar('Erreur', 'Veuillez valider les adresses en appuyant sur Entrée');
-      return;
+      // Try to search for locations if coordinates are not set
+      _searchLocation(_pickupController.text, true).then((_) {
+        _searchLocation(_destinationController.text, false).then((_) {
+          if (_pickupLat != null && _pickupLon != null && 
+              _destinationLat != null && _destinationLon != null) {
+            _navigateToMapPreview();
+          } else {
+            Get.snackbar('Erreur', 'Impossible de trouver les coordonnées des adresses');
+          }
+        });
+      });
+    } else {
+      _navigateToMapPreview();
     }
+  }
 
-    // Naviguer vers la page de prévisualisation avec carte
+  void _navigateToMapPreview() {
     Get.to(() => MapPreviewPage(
       pickupLat: _pickupLat!,
       pickupLon: _pickupLon!,
@@ -238,28 +367,62 @@ class _CreateRidePageState extends State<CreateRidePage> {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: TextField(
-                  controller: _pickupController,
-                  decoration: InputDecoration(
-                    hintText: 'Adresse de départ',
-                    suffixIcon: _isLoadingPickup
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : IconButton(
-                            icon: const Icon(Icons.my_location),
-                            onPressed: _getCurrentLocationAsPickup,
-                          ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _pickupController,
+                      focusNode: _pickupFocusNode,
+                      decoration: InputDecoration(
+                        hintText: 'Adresse de départ',
+                        suffixIcon: _isLoadingPickup
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : IconButton(
+                                icon: const Icon(Icons.my_location),
+                                onPressed: _getCurrentLocationAsPickup,
+                              ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                      ),
+                      onSubmitted: (value) => _searchLocation(value, true),
                     ),
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                  ),
-                  onSubmitted: (value) => _searchLocation(value, true),
+                    if (_pickupSuggestions.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _pickupSuggestions.length,
+                          itemBuilder: (context, index) {
+                            return ListTile(
+                              dense: true,
+                              title: Text(_pickupSuggestions[index]),
+                              leading: const Icon(Icons.location_on, size: 18),
+                              onTap: () => _selectSuggestion(_pickupSuggestions[index], true),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
@@ -290,25 +453,59 @@ class _CreateRidePageState extends State<CreateRidePage> {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: TextField(
-                  controller: _destinationController,
-                  decoration: InputDecoration(
-                    hintText: 'Où allez-vous ?',
-                    suffixIcon: _isLoadingDestination
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _destinationController,
+                      focusNode: _destinationFocusNode,
+                      decoration: InputDecoration(
+                        hintText: 'Où allez-vous ?',
+                        suffixIcon: _isLoadingDestination
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                      ),
+                      onSubmitted: (value) => _searchLocation(value, false),
                     ),
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                  ),
-                  onSubmitted: (value) => _searchLocation(value, false),
+                    if (_destinationSuggestions.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _destinationSuggestions.length,
+                          itemBuilder: (context, index) {
+                            return ListTile(
+                              dense: true,
+                              title: Text(_destinationSuggestions[index]),
+                              leading: const Icon(Icons.location_on, size: 18),
+                              onTap: () => _selectSuggestion(_destinationSuggestions[index], false),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],

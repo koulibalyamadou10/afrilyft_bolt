@@ -1,18 +1,21 @@
-import 'package:afrilyft/views/pages/promo_codes_page.dart';
-import 'package:afrilyft/views/pages/ride_history_page.dart';
-import 'package:afrilyft/views/pages/saved_locations_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../theme/app_colors.dart';
+import '../../controllers/auth_controller.dart';
 import 'edit_profile_page.dart';
 import 'payment_methods_page.dart';
-import '../pages/notification_settings_page.dart';
+import 'notification_settings_page.dart';
+import 'promo_codes_page.dart';
+import 'ride_history_page.dart';
+import 'saved_locations_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final AuthController authController = Get.find<AuthController>();
+    
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -25,31 +28,9 @@ class SettingsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // En-tête avec titre et bouton retour
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black54),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const SizedBox(width: 16),
-                  const Text(
-                    'Settings',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
             // Profil utilisateur
             Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+              margin: const EdgeInsets.fromLTRB(16, 20, 16, 20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -61,41 +42,48 @@ class SettingsPage extends StatelessWidget {
                   ),
                 ],
               ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.all(16),
-                leading: CircleAvatar(
-                  radius: 30,
-                  backgroundColor: const Color(0xFFFF6B5B),
-                  child: const Text(
-                    'JD',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
+              child: Obx(() {
+                final profile = authController.userProfile.value;
+                final initials = profile?.fullName.isNotEmpty == true
+                    ? profile!.fullName.split(' ').map((e) => e.isNotEmpty ? e[0] : '').join().toUpperCase()
+                    : 'U';
+                
+                return ListTile(
+                  contentPadding: const EdgeInsets.all(16),
+                  leading: CircleAvatar(
+                    radius: 30,
+                    backgroundColor: const Color(0xFFFF6B5B),
+                    child: Text(
+                      initials,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
                     ),
                   ),
-                ),
-                title: const Text(
-                  'John Doe',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                  title: Text(
+                    profile?.fullName ?? 'Utilisateur',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
-                ),
-                subtitle: const Text(
-                  '+234 800 123 4567',
-                  style: TextStyle(
-                    fontSize: 14,
+                  subtitle: Text(
+                    profile?.phone ?? '',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.black54,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right,
                     color: Colors.black54,
                   ),
-                ),
-                trailing: const Icon(
-                  Icons.chevron_right,
-                  color: Colors.black54,
-                ),
-                onTap: () => Get.to(() => const EditProfilePage()),
-              ),
+                  onTap: () => Get.to(() => const EditProfilePage()),
+                );
+              }),
             ),
             
             // Section Compte
@@ -216,9 +204,49 @@ class SettingsPage extends StatelessWidget {
               },
             ),
             
+            // Section Logout
+            _buildSectionTitle('Account'),
+            
+            _buildSettingCard(
+              icon: Icons.logout,
+              iconColor: Colors.red,
+              iconBackground: Colors.red.withOpacity(0.1),
+              title: 'Logout',
+              subtitle: 'Sign out from your account',
+              onTap: () {
+                _showLogoutConfirmation(context, authController);
+              },
+            ),
+            
             const SizedBox(height: 24),
           ],
         ),
+      ),
+    );
+  }
+  
+  void _showLogoutConfirmation(BuildContext context, AuthController authController) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Déconnexion'),
+        content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              authController.signOut();
+            },
+            child: const Text(
+              'Déconnexion',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -296,4 +324,4 @@ class SettingsPage extends StatelessWidget {
       ),
     );
   }
-} 
+}
