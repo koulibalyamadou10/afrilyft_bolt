@@ -12,7 +12,7 @@ class SupabaseService {
     required String password,
     required String fullName,
     required String phone,
-    String role = 'customer',
+    String role = 'driver',
   }) async {
     try {
       final response = await _client.auth.signUp(
@@ -78,127 +78,6 @@ class SupabaseService {
         .from('profiles')
         .update(updates)
         .eq('id', user.id);
-  }
-  
-  // Gestion des trajets
-  static Future<String> createRide({
-    required double pickupLat,
-    required double pickupLon,
-    required String pickupAddress,
-    required double destinationLat,
-    required double destinationLon,
-    required String destinationAddress,
-    String paymentMethod = 'cash',
-    String? notes,
-    DateTime? scheduledFor,
-  }) async {
-    final user = _client.auth.currentUser;
-    if (user == null) throw Exception('User not authenticated');
-    
-    try {
-      final response = await _client.rpc('create_ride_and_notify_drivers', params: {
-        'p_customer_id': user.id,
-        'p_pickup_lat': pickupLat,
-        'p_pickup_lon': pickupLon,
-        'p_pickup_address': pickupAddress,
-        'p_destination_lat': destinationLat,
-        'p_destination_lon': destinationLon,
-        'p_destination_address': destinationAddress,
-        'p_payment_method': paymentMethod,
-        'p_notes': notes,
-        'p_scheduled_for': scheduledFor?.toIso8601String(),
-      });
-      
-      return response as String;
-    } catch (e) {
-      print('Erreur lors de la création du trajet: $e');
-      rethrow;
-    }
-  }
-  
-  static Future<List<Map<String, dynamic>>> getUserRides() async {
-    final user = _client.auth.currentUser;
-    if (user == null) throw Exception('User not authenticated');
-    
-    try {
-      final response = await _client
-          .from('rides')
-          .select('''
-            *,
-            driver:profiles!rides_driver_id_fkey(full_name, phone)
-          ''')
-          .eq('customer_id', user.id)
-          .order('created_at', ascending: false);
-      
-      return List<Map<String, dynamic>>.from(response);
-    } catch (e) {
-      print('Erreur lors de la récupération des trajets: $e');
-      return [];
-    }
-  }
-  
-  static Future<Map<String, dynamic>?> getRideById(String rideId) async {
-    try {
-      final response = await _client
-          .from('rides')
-          .select('''
-            *,
-            customer:profiles!rides_customer_id_fkey(full_name, phone),
-            driver:profiles!rides_driver_id_fkey(full_name, phone)
-          ''')
-          .eq('id', rideId)
-          .single();
-      
-      return response;
-    } catch (e) {
-      print('Erreur lors de la récupération du trajet: $e');
-      return null;
-    }
-  }
-
-  // Fonction pour récupérer un trajet par ID de demande
-  static Future<Map<String, dynamic>?> getRideByRequestId(String requestId) async {
-    try {
-      final response = await _client
-          .from('ride_requests')
-          .select('''
-            ride_id,
-            rides!inner(
-              *,
-              customer:profiles!rides_customer_id_fkey(full_name, phone),
-              driver:profiles!rides_driver_id_fkey(full_name, phone)
-            )
-          ''')
-          .eq('id', requestId)
-          .single();
-      
-      return response['rides'];
-    } catch (e) {
-      print('Erreur lors de la récupération du trajet par demande: $e');
-      return null;
-    }
-  }
-  
-  // Recherche de chauffeurs
-  static Future<List<Map<String, dynamic>>> findNearbyDrivers({
-    required double pickupLat,
-    required double pickupLon,
-    double radiusKm = 5.0,
-    int maxDrivers = 10,
-  }) async {
-    try {
-      final response = await _client.rpc('find_nearby_drivers', params: {
-        'pickup_lat': pickupLat,
-        'pickup_lon': pickupLon,
-        'radius_km': radiusKm,
-        'max_drivers': maxDrivers,
-      });
-      
-      return List<Map<String, dynamic>>.from(response);
-    } catch (e) {
-      print('Erreur lors de la recherche de chauffeurs: $e');
-      return [];
-    }
   }
 
   // Fonctions pour l'app chauffeur
@@ -290,6 +169,48 @@ class SupabaseService {
     } catch (e) {
       print('Erreur lors de la mise à jour de disponibilité: $e');
       rethrow;
+    }
+  }
+
+  // Fonction pour récupérer un trajet par ID de demande
+  static Future<Map<String, dynamic>?> getRideByRequestId(String requestId) async {
+    try {
+      final response = await _client
+          .from('ride_requests')
+          .select('''
+            ride_id,
+            rides!inner(
+              *,
+              customer:profiles!rides_customer_id_fkey(full_name, phone),
+              driver:profiles!rides_driver_id_fkey(full_name, phone)
+            )
+          ''')
+          .eq('id', requestId)
+          .single();
+      
+      return response['rides'];
+    } catch (e) {
+      print('Erreur lors de la récupération du trajet par demande: $e');
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> getRideById(String rideId) async {
+    try {
+      final response = await _client
+          .from('rides')
+          .select('''
+            *,
+            customer:profiles!rides_customer_id_fkey(full_name, phone),
+            driver:profiles!rides_driver_id_fkey(full_name, phone)
+          ''')
+          .eq('id', rideId)
+          .single();
+      
+      return response;
+    } catch (e) {
+      print('Erreur lors de la récupération du trajet: $e');
+      return null;
     }
   }
   
