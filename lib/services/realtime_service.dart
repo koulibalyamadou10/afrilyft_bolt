@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../models/ride_model.dart';
 import '../controllers/ride_controller.dart';
 import '../controllers/auth_controller.dart';
+import 'package:flutter/material.dart';
 
 class RealtimeService {
   static final SupabaseClient _client = Supabase.instance.client;
@@ -14,7 +15,7 @@ class RealtimeService {
   // Initialiser les abonnements temps réel
   static Future<void> initialize() async {
     final authController = Get.find<AuthController>();
-    
+
     if (authController.isAuthenticated.value) {
       await _subscribeToRides();
       await _subscribeToDriverLocations();
@@ -29,7 +30,7 @@ class RealtimeService {
     await _driverLocationsChannel?.unsubscribe();
     await _rideRequestsChannel?.unsubscribe();
     await _notificationsChannel?.unsubscribe();
-    
+
     _ridesChannel = null;
     _driverLocationsChannel = null;
     _rideRequestsChannel = null;
@@ -40,25 +41,26 @@ class RealtimeService {
   static Future<void> _subscribeToRides() async {
     final authController = Get.find<AuthController>();
     final userId = authController.user.value?.id;
-    
+
     if (userId == null) return;
 
-    _ridesChannel = _client
-        .channel('rides_channel')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'rides',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: authController.isCustomer ? 'customer_id' : 'driver_id',
-            value: userId,
-          ),
-          callback: (payload) {
-            _handleRideChange(payload);
-          },
-        )
-        .subscribe();
+    _ridesChannel =
+        _client
+            .channel('rides_channel')
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'rides',
+              filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: authController.isCustomer ? 'customer_id' : 'driver_id',
+                value: userId,
+              ),
+              callback: (payload) {
+                _handleRideChange(payload);
+              },
+            )
+            .subscribe();
 
     print('✅ Abonné aux changements de trajets');
   }
@@ -66,25 +68,26 @@ class RealtimeService {
   // Écouter les positions des chauffeurs
   static Future<void> _subscribeToDriverLocations() async {
     final authController = Get.find<AuthController>();
-    
+
     if (!authController.isCustomer) return;
 
-    _driverLocationsChannel = _client
-        .channel('driver_locations_channel')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'driver_locations',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'is_available',
-            value: true,
-          ),
-          callback: (payload) {
-            _handleDriverLocationChange(payload);
-          },
-        )
-        .subscribe();
+    _driverLocationsChannel =
+        _client
+            .channel('driver_locations_channel')
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'driver_locations',
+              filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'is_available',
+                value: true,
+              ),
+              callback: (payload) {
+                _handleDriverLocationChange(payload);
+              },
+            )
+            .subscribe();
 
     print('✅ Abonné aux positions des chauffeurs');
   }
@@ -93,25 +96,26 @@ class RealtimeService {
   static Future<void> _subscribeToRideRequests() async {
     final authController = Get.find<AuthController>();
     final userId = authController.user.value?.id;
-    
+
     if (userId == null || !authController.isDriver) return;
 
-    _rideRequestsChannel = _client
-        .channel('ride_requests_channel')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'ride_requests',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'driver_id',
-            value: userId,
-          ),
-          callback: (payload) {
-            _handleRideRequestChange(payload);
-          },
-        )
-        .subscribe();
+    _rideRequestsChannel =
+        _client
+            .channel('ride_requests_channel')
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'ride_requests',
+              filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'driver_id',
+                value: userId,
+              ),
+              callback: (payload) {
+                _handleRideRequestChange(payload);
+              },
+            )
+            .subscribe();
 
     print('✅ Abonné aux demandes de trajet');
   }
@@ -120,25 +124,26 @@ class RealtimeService {
   static Future<void> _subscribeToNotifications() async {
     final authController = Get.find<AuthController>();
     final userId = authController.user.value?.id;
-    
+
     if (userId == null) return;
 
-    _notificationsChannel = _client
-        .channel('notifications_channel')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'notifications',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
-          callback: (payload) {
-            _handleNotificationChange(payload);
-          },
-        )
-        .subscribe();
+    _notificationsChannel =
+        _client
+            .channel('notifications_channel')
+            .onPostgresChanges(
+              event: PostgresChangeEvent.insert,
+              schema: 'public',
+              table: 'notifications',
+              filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'user_id',
+                value: userId,
+              ),
+              callback: (payload) {
+                _handleNotificationChange(payload);
+              },
+            )
+            .subscribe();
 
     print('✅ Abonné aux notifications');
   }
@@ -147,33 +152,33 @@ class RealtimeService {
   static void _handleRideChange(PostgresChangePayload payload) {
     try {
       final rideController = Get.find<RideController>();
-      
+
       switch (payload.eventType) {
         case PostgresChangeEvent.insert:
         case PostgresChangeEvent.update:
           final rideData = payload.newRecord;
           if (rideData != null) {
             final ride = RideModel.fromJson(rideData);
-            
+
             // Mettre à jour le trajet actuel si c'est le bon
             if (rideController.currentRide.value?.id == ride.id) {
               rideController.currentRide.value = ride;
               print('🔄 Trajet mis à jour: ${ride.status}');
-              
+
               // Afficher une notification selon le statut
               _showRideStatusNotification(ride);
-              
+
               // IMPORTANT: Si accepté, arrêter la recherche
               if (ride.status == RideStatus.accepted) {
                 rideController.isSearchingDriver.value = false;
               }
             }
-            
+
             // Mettre à jour l'historique
             rideController.updateRideInHistory(ride);
           }
           break;
-          
+
         case PostgresChangeEvent.delete:
           final oldRecord = payload.oldRecord;
           if (oldRecord != null) {
@@ -197,14 +202,16 @@ class RealtimeService {
   static void _handleDriverLocationChange(PostgresChangePayload payload) {
     try {
       final rideController = Get.find<RideController>();
-      
+
       if (payload.eventType == PostgresChangeEvent.insert ||
           payload.eventType == PostgresChangeEvent.update) {
         final locationData = payload.newRecord;
         if (locationData != null) {
           final driverLocation = DriverLocation.fromJson(locationData);
           rideController.updateDriverLocation(driverLocation);
-          print('📍 Position chauffeur mise à jour: ${driverLocation.driverId}');
+          print(
+            '📍 Position chauffeur mise à jour: ${driverLocation.driverId}',
+          );
         }
       }
     } catch (e) {
@@ -219,7 +226,7 @@ class RealtimeService {
         final requestData = payload.newRecord;
         if (requestData != null) {
           print('🚗 Nouvelle demande de trajet reçue');
-          
+
           // Afficher une notification push locale
           Get.snackbar(
             '🚗 Nouvelle demande',
@@ -243,9 +250,9 @@ class RealtimeService {
         if (notificationData != null) {
           final title = notificationData['title'] as String;
           final message = notificationData['message'] as String;
-          
+
           print('🔔 Nouvelle notification: $title');
-          
+
           // Afficher la notification
           Get.snackbar(
             title,
@@ -265,7 +272,7 @@ class RealtimeService {
   static void _showRideStatusNotification(RideModel ride) {
     String title = '';
     String message = '';
-    
+
     switch (ride.status) {
       case RideStatus.accepted:
         title = '🚗 Chauffeur trouvé !';
@@ -286,7 +293,7 @@ class RealtimeService {
       default:
         return;
     }
-    
+
     if (title.isNotEmpty) {
       Get.snackbar(
         title,
@@ -309,7 +316,7 @@ class RealtimeService {
     try {
       final authController = Get.find<AuthController>();
       final userId = authController.user.value?.id;
-      
+
       if (userId == null || !authController.isDriver) return;
 
       await _client.from('driver_locations').upsert({
@@ -321,7 +328,7 @@ class RealtimeService {
         'is_available': isAvailable,
         'last_updated': DateTime.now().toIso8601String(),
       });
-      
+
       print('📍 Position mise à jour: $latitude, $longitude');
     } catch (e) {
       print('❌ Erreur lors de la mise à jour de position: $e');
@@ -333,14 +340,14 @@ class RealtimeService {
     try {
       final authController = Get.find<AuthController>();
       final userId = authController.user.value?.id;
-      
+
       if (userId == null || !authController.isDriver) return false;
 
-      final result = await _client.rpc('accept_ride', params: {
-        'p_request_id': requestId,
-        'p_driver_id': userId,
-      });
-      
+      final result = await _client.rpc(
+        'accept_ride',
+        params: {'p_request_id': requestId, 'p_driver_id': userId},
+      );
+
       return result as bool;
     } catch (e) {
       print('❌ Erreur lors de l\'acceptation du trajet: $e');
@@ -353,22 +360,19 @@ class RealtimeService {
     try {
       final authController = Get.find<AuthController>();
       final userId = authController.user.value?.id;
-      
+
       if (userId == null) return false;
 
-      // Appeler la fonction Edge pour mettre à jour le statut
-      final response = await _client.functions.invoke('ride-status', {
-        body: {
-          rideId: rideId,
-          status: newStatus,
-          userId: userId,
-        },
-      });
-      
-      if (response.error) {
-        throw Exception(response.error?.message);
-      }
-      
+      // Mettre à jour directement dans la base de données
+      await _client
+          .from('rides')
+          .update({
+            'status': newStatus,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', rideId)
+          .eq(authController.isDriver ? 'driver_id' : 'customer_id', userId);
+
       return true;
     } catch (e) {
       print('❌ Erreur lors de la mise à jour du statut: $e');
@@ -377,13 +381,17 @@ class RealtimeService {
   }
 
   // NOUVEAU: Fonction pour s'abonner aux mises à jour de trajets
-  static void subscribeToRideUpdates(Function(Map<String, dynamic>) onRideUpdate) {
+  static void subscribeToRideUpdates(
+    Function(Map<String, dynamic>) onRideUpdate,
+  ) {
     // Cette fonction sera appelée par le RideController
     // pour écouter spécifiquement les mises à jour de trajets
   }
 
   // NOUVEAU: Fonction pour s'abonner aux demandes de trajet
-  static void subscribeToRideRequests(Function(Map<String, dynamic>) onRideRequest) {
+  static void subscribeToRideRequests(
+    Function(Map<String, dynamic>) onRideRequest,
+  ) {
     // Cette fonction sera appelée par le DriverController
     // pour écouter spécifiquement les nouvelles demandes de trajet
   }
