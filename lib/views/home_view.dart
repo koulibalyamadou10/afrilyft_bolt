@@ -10,6 +10,7 @@ import 'pages/settings_page.dart';
 import 'pages/create_ride_page.dart';
 import 'pages/ride_history_page.dart';
 import 'pages/ride_tracking_page.dart';
+import 'pages/map_test_page.dart';
 
 class HomeView extends StatelessWidget {
   const HomeView({super.key});
@@ -17,16 +18,18 @@ class HomeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Initialiser les contrôleurs
-    final NavigationController navigationController = Get.put(NavigationController());
+    final NavigationController navigationController = Get.put(
+      NavigationController(),
+    );
     final RideController rideController = Get.put(RideController());
-    
+
     // Liste des pages à afficher
     final List<Widget> pages = [
       const RidesPage(),
       const CarpoolPage(),
       const SettingsPage(),
     ];
-    
+
     return Scaffold(
       body: Obx(() => pages[navigationController.currentIndex.value]),
       bottomNavigationBar: Obx(
@@ -51,7 +54,10 @@ class RidesPage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.secondary,
         elevation: 0,
-        title: const Text('AfriLyft', style: TextStyle(color: AppColors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'AfriLyft',
+          style: TextStyle(color: AppColors.white, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         actions: [
           IconButton(
@@ -82,7 +88,10 @@ class RidesPage extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.directions_car, color: Colors.white),
+                            const Icon(
+                              Icons.directions_car,
+                              color: Colors.white,
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               rideController.getStatusText(currentRide.status),
@@ -108,7 +117,8 @@ class RidesPage extends StatelessWidget {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: () => Get.to(() => const RideTrackingPage()),
+                            onPressed:
+                                () => Get.to(() => const RideTrackingPage()),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: AppColors.primary,
@@ -122,7 +132,7 @@ class RidesPage extends StatelessWidget {
                 }
                 return const SizedBox.shrink();
               }),
-              
+
               // Barre de recherche principale
               GestureDetector(
                 onTap: () => Get.to(() => const CreateRidePage()),
@@ -147,10 +157,7 @@ class RidesPage extends StatelessWidget {
                       const Expanded(
                         child: Text(
                           'Où allez-vous ?',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 16,
-                          ),
+                          style: TextStyle(color: Colors.grey, fontSize: 16),
                         ),
                       ),
                       Container(
@@ -169,9 +176,35 @@ class RidesPage extends StatelessWidget {
                   ),
                 ),
               ),
-              
+
+              const SizedBox(height: 16),
+
+              // Bouton de test Google Maps (temporaire)
+              Container(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Get.to(() => const MapTestPage()),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.map, size: 20),
+                      SizedBox(width: 8),
+                      Text('Test Google Maps'),
+                    ],
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 24),
-              
+
               // Bannière de bienvenue
               Container(
                 height: 180,
@@ -238,9 +271,9 @@ class RidesPage extends StatelessWidget {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Section Suggestions
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -257,16 +290,14 @@ class RidesPage extends StatelessWidget {
                     onPressed: () {},
                     child: const Text(
                       'Voir tout',
-                      style: TextStyle(
-                        color: AppColors.mediumGrey,
-                      ),
+                      style: TextStyle(color: AppColors.mediumGrey),
                     ),
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Options de trajet
               Row(
                 children: [
@@ -296,7 +327,7 @@ class RidesPage extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildOptionCard({
     required IconData icon,
     required String label,
@@ -319,7 +350,10 @@ class RidesPage extends StatelessWidget {
                   top: 8,
                   left: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.success,
                       borderRadius: BorderRadius.circular(4),
@@ -338,11 +372,7 @@ class RidesPage extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      icon,
-                      color: AppColors.white,
-                      size: 28,
-                    ),
+                    Icon(icon, color: AppColors.white, size: 28),
                     const SizedBox(height: 8),
                     Text(
                       label,

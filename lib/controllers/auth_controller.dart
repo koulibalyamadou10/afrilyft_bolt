@@ -69,9 +69,9 @@ class AuthController extends GetxController {
       final profile = await SupabaseService.getCurrentUserProfile();
       if (profile != null) {
         userProfile.value = UserProfile.fromJson(profile);
-        
-        // Navigate to home after profile is loaded
-        Get.offAll(() => const HomeView());
+
+        // Don't navigate here, let splash screen handle it
+        // Get.offAll(() => const HomeView());
       }
     } catch (e) {
       print('Erreur lors du chargement du profil: $e');
@@ -87,7 +87,7 @@ class AuthController extends GetxController {
   }) async {
     try {
       isLoading.value = true;
-      
+
       final response = await SupabaseService.signUp(
         email: email,
         password: password,
@@ -118,13 +118,10 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<bool> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<bool> signIn({required String email, required String password}) async {
     try {
       isLoading.value = true;
-      
+
       final response = await SupabaseService.signIn(
         email: email,
         password: password,
@@ -134,10 +131,7 @@ class AuthController extends GetxController {
         // Profile will be loaded automatically via _loadUserProfile
         return true;
       } else {
-        Get.snackbar(
-          'Erreur',
-          'Email ou mot de passe incorrect',
-        );
+        Get.snackbar('Erreur', 'Email ou mot de passe incorrect');
         return false;
       }
     } catch (e) {
@@ -162,14 +156,11 @@ class AuthController extends GetxController {
   Future<void> updateProfile(Map<String, dynamic> updates) async {
     try {
       isLoading.value = true;
-      
+
       await SupabaseService.updateProfile(updates);
       await _loadUserProfile();
-      
-      Get.snackbar(
-        'Succès',
-        'Profil mis à jour avec succès',
-      );
+
+      Get.snackbar('Succès', 'Profil mis à jour avec succès');
     } catch (e) {
       Get.snackbar('Erreur', 'Erreur lors de la mise à jour: $e');
     } finally {

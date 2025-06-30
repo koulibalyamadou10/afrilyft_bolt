@@ -1,9 +1,11 @@
+import 'package:afrilyft/views/pages/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../theme/app_colors.dart';
 import '../../controllers/auth_controller.dart';
 import 'onboarding_page.dart';
+import '../home_view.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,7 +14,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -21,43 +24,53 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    
+
     // Configuration des animations
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
       ),
     );
-    
+
     _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
       ),
     );
-    
+
     // Démarrer l'animation
     _animationController.forward();
-    
+
     // Navigation vers la page appropriée après un délai
     Future.delayed(const Duration(seconds: 3), () {
       _navigateToNextScreen();
     });
   }
 
-  void _navigateToNextScreen() {
-    // If user is authenticated, go to home
+  void _navigateToNextScreen() async {
+    // If user is authenticated, wait for profile to load then go to home
     if (_authController.isAuthenticated.value) {
-      // No need to navigate, auth controller will handle it
+      // Wait a bit for profile to load
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Check if profile is loaded
+      if (_authController.userProfile.value != null) {
+        Get.offAll(() => const HomeView(), transition: Transition.fadeIn);
+      } else {
+        // If profile not loaded, try again after a short delay
+        await Future.delayed(const Duration(milliseconds: 1000));
+        Get.offAll(() => const HomeView(), transition: Transition.fadeIn);
+      }
       return;
     }
-    
+
     // If user has seen onboarding, go to login
     if (_authController.hasSeenOnboarding.value) {
       Get.off(() => const LoginPage(), transition: Transition.fadeIn);
@@ -105,9 +118,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                               size: 70,
                             ),
                           ),
-                          
+
                           const SizedBox(height: 24),
-                          
+
                           // Nom de l'application
                           const Text(
                             'AFRILYFT',
@@ -118,9 +131,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                               letterSpacing: 2,
                             ),
                           ),
-                          
+
                           const SizedBox(height: 8),
-                          
+
                           // Slogan
                           const Text(
                             'Safe rides across Africa',
@@ -137,7 +150,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               ),
             ),
           ),
-          
+
           // Indicateur de chargement en bas de la page
           const Padding(
             padding: EdgeInsets.only(bottom: 50.0),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../controllers/ride_controller.dart';
 import '../../theme/app_colors.dart';
 import 'ride_tracking_page.dart';
@@ -35,11 +36,62 @@ class MapPreviewPage extends StatefulWidget {
 class _MapPreviewPageState extends State<MapPreviewPage> {
   final RideController rideController = Get.find<RideController>();
   bool _showingDrivers = false;
+  bool _mapError = false;
+  GoogleMapController? _mapController;
+  Set<Marker> _markers = {};
+  Set<Polyline> _polylines = {};
 
   @override
   void initState() {
     super.initState();
+    _initializeMap();
     _loadNearbyDrivers();
+  }
+
+  void _initializeMap() {
+    try {
+      // Créer les marqueurs pour le point de départ et d'arrivée
+      _markers = {
+        Marker(
+          markerId: const MarkerId('pickup'),
+          position: LatLng(widget.pickupLat, widget.pickupLon),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
+          ),
+          infoWindow: InfoWindow(
+            title: 'Point de départ',
+            snippet: widget.pickupAddress,
+          ),
+        ),
+        Marker(
+          markerId: const MarkerId('destination'),
+          position: LatLng(widget.destinationLat, widget.destinationLon),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          infoWindow: InfoWindow(
+            title: 'Destination',
+            snippet: widget.destinationAddress,
+          ),
+        ),
+      };
+
+      // Créer une ligne entre le point de départ et d'arrivée
+      _polylines = {
+        Polyline(
+          polylineId: const PolylineId('route'),
+          points: [
+            LatLng(widget.pickupLat, widget.pickupLon),
+            LatLng(widget.destinationLat, widget.destinationLon),
+          ],
+          color: AppColors.primary,
+          width: 3,
+        ),
+      };
+    } catch (e) {
+      print('Erreur lors de l\'initialisation de la carte: $e');
+      setState(() {
+        _mapError = true;
+      });
+    }
   }
 
   Future<void> _loadNearbyDrivers() async {
@@ -47,15 +99,47 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
       _showingDrivers = true;
     });
 
-    // Charger les chauffeurs à proximité pour prévisualisation
-    await rideController.findNearbyDriversPreview(
-      widget.pickupLat,
-      widget.pickupLon,
-    );
+    try {
+      // Charger les chauffeurs à proximité pour prévisualisation
+      await rideController.findNearbyDriversPreview(
+        widget.pickupLat,
+        widget.pickupLon,
+      );
 
-    setState(() {
-      _showingDrivers = false;
-    });
+      // Ajouter les marqueurs des chauffeurs
+      _addDriverMarkers();
+    } catch (e) {
+      print('Erreur lors du chargement des chauffeurs: $e');
+    } finally {
+      setState(() {
+        _showingDrivers = false;
+      });
+    }
+  }
+
+  void _addDriverMarkers() {
+    try {
+      final driverMarkers =
+          rideController.nearbyDrivers.map((driver) {
+            return Marker(
+              markerId: MarkerId('driver_${driver.id}'),
+              position: LatLng(driver.lat, driver.lon),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueBlue,
+              ),
+              infoWindow: InfoWindow(
+                title: 'Chauffeur disponible',
+                snippet: 'ID: ${driver.driverId}',
+              ),
+            );
+          }).toSet();
+
+      setState(() {
+        _markers.addAll(driverMarkers);
+      });
+    } catch (e) {
+      print('Erreur lors de l\'ajout des marqueurs des chauffeurs: $e');
+    }
   }
 
   Future<void> _startRideSearch() async {
@@ -87,250 +171,154 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final distance = _calculateDistance();
-    final estimatedTime = (distance * 2.5).round(); // 2.5 min par km
-    final estimatedPrice = (distance * 1500).round(); // 1500 GNF par km
+  void _onMapCreated(GoogleMapController controller) {
+    _mapController = controller;
 
-    return Scaffold(
-      backgroundColor: AppColors.secondary,
-      body: Stack(
+    // Ajuster la caméra pour afficher tous les marqueurs
+    _fitBounds();
+  }
+
+  void _fitBounds() {
+    if (_mapController == null) return;
+
+    try {
+      final bounds = LatLngBounds(
+        southwest: LatLng(
+          [
+            widget.pickupLat,
+            widget.destinationLat,
+          ].reduce((a, b) => a < b ? a : b),
+          [
+            widget.pickupLon,
+            widget.destinationLon,
+          ].reduce((a, b) => a < b ? a : b),
+        ),
+        northeast: LatLng(
+          [
+            widget.pickupLat,
+            widget.destinationLat,
+          ].reduce((a, b) => a > b ? a : b),
+          [
+            widget.pickupLon,
+            widget.destinationLon,
+          ].reduce((a, b) => a > b ? a : b),
+        ),
+      );
+
+      _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 50));
+    } catch (e) {
+      print('Erreur lors de l\'ajustement de la caméra: $e');
+    }
+  }
+
+  Widget _buildMapWidget() {
+    if (_mapError) {
+      return _buildMapErrorWidget();
+    }
+
+    return GoogleMap(
+      onMapCreated: _onMapCreated,
+      initialCameraPosition: CameraPosition(
+        target: LatLng(
+          (widget.pickupLat + widget.destinationLat) / 2,
+          (widget.pickupLon + widget.destinationLon) / 2,
+        ),
+        zoom: 12,
+      ),
+      markers: _markers,
+      polylines: _polylines,
+      myLocationEnabled: true,
+      myLocationButtonEnabled: true,
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
+      onCameraMove: (position) {
+        // Gérer les erreurs de carte ici
+      },
+    );
+  }
+
+  Widget _buildMapErrorWidget() {
+    return Container(
+      color: Colors.grey[300],
+      child: Stack(
         children: [
-          // Carte simulée avec chauffeurs
-          Container(
-            color: Colors.grey[300],
-            child: Stack(
+          // Carte statique de base
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Fond de carte
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.map,
-                        size: 100,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Carte avec chauffeurs',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                Icon(Icons.map, size: 100, color: Colors.grey[600]),
+                const SizedBox(height: 16),
+                Text(
+                  'Carte temporairement indisponible',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-
-                // Point de départ
-                Positioned(
-                  bottom: 300,
-                  left: 100,
-                  child: _buildLocationMarker(
-                    Icons.radio_button_checked,
-                    AppColors.primary,
-                    'Départ',
-                  ),
+                const SizedBox(height: 8),
+                Text(
+                  'Vérifiez votre connexion internet',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                 ),
-
-                // Point d'arrivée
-                Positioned(
-                  top: 150,
-                  right: 80,
-                  child: _buildLocationMarker(
-                    Icons.location_on,
-                    Colors.red,
-                    'Arrivée',
-                  ),
-                ),
-
-                // Chauffeurs à proximité
-                Obx(() => Stack(
-                  children: rideController.nearbyDrivers.map((driver) => Positioned(
-                    top: 200 + (driver.lat * 10).toInt() % 200,
-                    left: 100 + (driver.lon * 10).toInt() % 200,
-                    child: _buildDriverMarker(),
-                  )).toList(),
-                )),
-
-                // Indicateur de chargement des chauffeurs
-                if (_showingDrivers)
-                  const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                    ),
-                  ),
               ],
             ),
           ),
 
-          // En-tête
+          // Marqueurs simulés sur la carte statique
           Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
+            bottom: 300,
+            left: 100,
+            child: _buildStaticMarker(
+              Icons.radio_button_checked,
+              AppColors.primary,
+              'Départ',
+            ),
+          ),
+
+          Positioned(
+            top: 150,
+            right: 80,
+            child: _buildStaticMarker(Icons.location_on, Colors.red, 'Arrivée'),
+          ),
+
+          // Ligne de trajet simulée
+          Positioned(
+            top: 200,
+            left: 120,
             child: Container(
-              padding: const EdgeInsets.only(top: 50, left: 16, right: 16, bottom: 16),
+              width: 200,
+              height: 2,
               decoration: BoxDecoration(
-                color: AppColors.secondary.withOpacity(0.9),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => Get.back(),
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'Aperçu du trajet',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(width: 48), // Pour équilibrer le bouton retour
-                ],
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(1),
               ),
             ),
           ),
 
-          // Panneau d'informations
+          // Bouton de réessai
           Positioned(
-            bottom: 0,
+            bottom: 100,
             left: 0,
             right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  topRight: Radius.circular(24),
+            child: Center(
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _mapError = false;
+                    _initializeMap();
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                 ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Informations du trajet
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLocationRow(
-                              Icons.radio_button_checked,
-                              AppColors.primary,
-                              widget.pickupAddress,
-                            ),
-                            const SizedBox(height: 12),
-                            _buildLocationRow(
-                              Icons.location_on,
-                              Colors.grey[600]!,
-                              widget.destinationAddress,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Détails du trajet
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildDetailItem(
-                          Icons.straighten,
-                          '${distance.toStringAsFixed(1)} km',
-                          'Distance',
-                        ),
-                        _buildDetailItem(
-                          Icons.access_time,
-                          '$estimatedTime min',
-                          'Durée estimée',
-                        ),
-                        _buildDetailItem(
-                          Icons.money,
-                          '${estimatedPrice.toString()} GNF',
-                          'Prix estimé',
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Chauffeurs disponibles
-                  Obx(() => Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.local_taxi,
-                          color: AppColors.primary,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            '${rideController.nearbyDrivers.length} chauffeurs disponibles dans votre zone',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
-
-                  const SizedBox(height: 20),
-
-                  // Bouton de confirmation
-                  Obx(() => SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: rideController.isLoading.value ? null : _startRideSearch,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: rideController.isLoading.value
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : Text(
-                              widget.scheduledFor != null 
-                                  ? 'Programmer le trajet' 
-                                  : 'Rechercher un chauffeur',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
-                  )),
-                ],
+                child: const Text('Réessayer Google Maps'),
               ),
             ),
           ),
@@ -339,7 +327,7 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
     );
   }
 
-  Widget _buildLocationMarker(IconData icon, Color color, String label) {
+  Widget _buildStaticMarker(IconData icon, Color color, String label) {
     return Column(
       children: [
         Container(
@@ -373,77 +361,279 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
           ),
           child: Text(
             label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildDriverMarker() {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: Colors.green,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+  @override
+  Widget build(BuildContext context) {
+    final distance = _calculateDistance();
+    final estimatedTime = (distance * 2.5).round(); // 2.5 min par km
+    final estimatedPrice = (distance * 1500).round(); // 1500 GNF par km
+
+    return Scaffold(
+      backgroundColor: AppColors.secondary,
+      body: Stack(
+        children: [
+          // Carte Google Maps
+          _buildMapWidget(),
+
+          // Indicateur de chargement des chauffeurs
+          if (_showingDrivers)
+            Positioned(
+              top: 100,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primary,
+                          ),
+                          strokeWidth: 2,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Recherche de chauffeurs...',
+                        style: TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // En-tête
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.only(
+                top: 50,
+                left: 16,
+                right: 16,
+                bottom: 16,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withOpacity(0.9),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Get.back(),
+                  ),
+                  const Expanded(
+                    child: Text(
+                      'Aperçu du trajet',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(width: 48), // Pour équilibrer le bouton retour
+                ],
+              ),
+            ),
+          ),
+
+          // Panneau d'informations en bas
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Informations du trajet
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildInfoCard(
+                          'Distance',
+                          '${distance.toStringAsFixed(1)} km',
+                          Icons.straighten,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildInfoCard(
+                          'Temps estimé',
+                          '${estimatedTime} min',
+                          Icons.access_time,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildInfoCard(
+                          'Prix estimé',
+                          '${estimatedPrice} GNF',
+                          Icons.attach_money,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Adresses
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildAddressRow(
+                          'Départ',
+                          widget.pickupAddress,
+                          Icons.radio_button_checked,
+                          AppColors.primary,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildAddressRow(
+                          'Destination',
+                          widget.destinationAddress,
+                          Icons.location_on,
+                          Colors.red,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Bouton de confirmation
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _showingDrivers ? null : _startRideSearch,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child:
+                          _showingDrivers
+                              ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Text(
+                                'Confirmer le trajet',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
-      ),
-      child: const Icon(
-        Icons.directions_car,
-        color: Colors.white,
-        size: 20,
       ),
     );
   }
 
-  Widget _buildLocationRow(IconData icon, Color color, String address) {
+  Widget _buildInfoCard(String title, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: AppColors.primary, size: 20),
+          const SizedBox(height: 4),
+          Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddressRow(
+    String title,
+    String address,
+    IconData icon,
+    Color color,
+  ) {
     return Row(
       children: [
         Icon(icon, color: color, size: 20),
         const SizedBox(width: 12),
         Expanded(
-          child: Text(
-            address,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDetailItem(IconData icon, String value, String label) {
-    return Column(
-      children: [
-        Icon(icon, color: AppColors.primary, size: 24),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                address,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         ),
       ],
