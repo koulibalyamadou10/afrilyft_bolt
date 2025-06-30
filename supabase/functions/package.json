@@ -1,0 +1,19 @@
+{
+  "name": "afrilyft-edge-functions",
+  "version": "1.0.0",
+  "description": "Supabase Edge Functions for AfriLyft",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "supabase",
+    "edge-functions",
+    "afrilyft"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.7"
+  }
+}
