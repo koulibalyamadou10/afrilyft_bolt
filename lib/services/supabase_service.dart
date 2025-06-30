@@ -3,9 +3,9 @@ import 'package:geolocator/geolocator.dart';
 
 class SupabaseService {
   static final SupabaseClient _client = Supabase.instance.client;
-  
+
   static SupabaseClient get client => _client;
-  
+
   // Authentification
   static Future<AuthResponse> signUp({
     required String email,
@@ -18,20 +18,16 @@ class SupabaseService {
       final response = await _client.auth.signUp(
         email: email,
         password: password,
-        data: {
-          'full_name': fullName,
-          'phone': phone,
-          'role': role,
-        },
+        data: {'full_name': fullName, 'phone': phone, 'role': role},
       );
-      
+
       return response;
     } catch (e) {
       print('Erreur lors de l\'inscription: $e');
       rethrow;
     }
   }
-  
+
   static Future<AuthResponse> signIn({
     required String email,
     required String password,
@@ -46,40 +42,34 @@ class SupabaseService {
       rethrow;
     }
   }
-  
+
   static Future<void> signOut() async {
     await _client.auth.signOut();
   }
-  
+
   // Profil utilisateur
   static Future<Map<String, dynamic>?> getCurrentUserProfile() async {
     final user = _client.auth.currentUser;
     if (user == null) return null;
-    
+
     try {
-      final response = await _client
-          .from('profiles')
-          .select()
-          .eq('id', user.id)
-          .single();
-      
+      final response =
+          await _client.from('profiles').select().eq('id', user.id).single();
+
       return response;
     } catch (e) {
       print('Erreur lors de la récupération du profil: $e');
       return null;
     }
   }
-  
+
   static Future<void> updateProfile(Map<String, dynamic> updates) async {
     final user = _client.auth.currentUser;
     if (user == null) throw Exception('User not authenticated');
-    
-    await _client
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id);
+
+    await _client.from('profiles').update(updates).eq('id', user.id);
   }
-  
+
   // Gestion des trajets
   static Future<String> createRide({
     required double pickupLat,
@@ -93,60 +83,82 @@ class SupabaseService {
     DateTime? scheduledFor,
   }) async {
     final user = _client.auth.currentUser;
-    if (user == null) throw Exception('User not authenticated');
-    
+    if (user == null) {
+      print('❌ Erreur: Utilisateur non authentifié');
+      throw Exception('Vous devez être connecté pour créer un trajet');
+    }
+
+    print('👤 Utilisateur connecté: ${user.email}');
+
     try {
+      print('📝 Création du trajet dans la base de données...');
+
       // Créer d'abord le trajet
-      final rideResponse = await _client
-          .from('rides')
-          .insert({
-            'customer_id': user.id,
-            'pickup_latitude': pickupLat,
-            'pickup_longitude': pickupLon,
-            'pickup_address': pickupAddress,
-            'destination_latitude': destinationLat,
-            'destination_longitude': destinationLon,
-            'destination_address': destinationAddress,
-            'status': 'searching',
-            'payment_method': paymentMethod,
-            'notes': notes,
-            'scheduled_for': scheduledFor?.toIso8601String(),
-          })
-          .select('id')
-          .single();
-      
+      final rideResponse =
+          await _client
+              .from('rides')
+              .insert({
+                'customer_id': user.id,
+                'pickup_latitude': pickupLat,
+                'pickup_longitude': pickupLon,
+                'pickup_address': pickupAddress,
+                'destination_latitude': destinationLat,
+                'destination_longitude': destinationLon,
+                'destination_address': destinationAddress,
+                'status': 'searching',
+                'payment_method': paymentMethod,
+                'notes': notes,
+                'scheduled_for': scheduledFor?.toIso8601String(),
+              })
+              .select('id')
+              .single();
+
       final rideId = rideResponse['id'] as String;
-      
+      print('✅ Trajet créé avec ID: $rideId');
+
       // Trouver des chauffeurs à proximité
+      print('🔍 Recherche de chauffeurs à proximité...');
       final nearbyDrivers = await findNearbyDrivers(
         pickupLat: pickupLat,
         pickupLon: pickupLon,
         radiusKm: 5.0,
         maxDrivers: 10,
       );
-      
+
+      print('🚗 ${nearbyDrivers.length} chauffeurs trouvés à proximité');
+
       // Créer des demandes de trajet pour les chauffeurs à proximité
       if (nearbyDrivers.isNotEmpty) {
-        final rideRequests = nearbyDrivers.map((driver) => ({
-          'ride_id': rideId,
-          'driver_id': driver['driver_id'],
-          'status': 'sent',
-        })).toList();
-        
+        print('📨 Envoi des demandes aux chauffeurs...');
+        final rideRequests =
+            nearbyDrivers
+                .map(
+                  (driver) => ({
+                    'ride_id': rideId,
+                    'driver_id': driver['driver_id'],
+                    'status': 'sent',
+                  }),
+                )
+                .toList();
+
         await _client.from('ride_requests').insert(rideRequests);
+        print('✅ Demandes envoyées aux chauffeurs');
+      } else {
+        print('⚠️ Aucun chauffeur trouvé à proximité');
       }
-      
+
       return rideId;
     } catch (e) {
-      print('Erreur lors de la création du trajet: $e');
+      print('❌ Erreur lors de la création du trajet: $e');
+      print('🔍 Détails de l\'erreur: ${e.toString()}');
       rethrow;
     }
   }
-  
+
   static Future<List<Map<String, dynamic>>> getUserRides() async {
     final user = _client.auth.currentUser;
     if (user == null) throw Exception('User not authenticated');
-    
+
     try {
       final response = await _client
           .from('rides')
@@ -156,26 +168,27 @@ class SupabaseService {
           ''')
           .eq('customer_id', user.id)
           .order('created_at', ascending: false);
-      
+
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       print('Erreur lors de la récupération des trajets: $e');
       return [];
     }
   }
-  
+
   static Future<Map<String, dynamic>?> getRideById(String rideId) async {
     try {
-      final response = await _client
-          .from('rides')
-          .select('''
+      final response =
+          await _client
+              .from('rides')
+              .select('''
             *,
             customer:profiles!rides_customer_id_fkey(full_name, phone),
             driver:profiles!rides_driver_id_fkey(full_name, phone)
           ''')
-          .eq('id', rideId)
-          .single();
-      
+              .eq('id', rideId)
+              .single();
+
       return response;
     } catch (e) {
       print('Erreur lors de la récupération du trajet: $e');
@@ -184,11 +197,14 @@ class SupabaseService {
   }
 
   // Fonction pour récupérer un trajet par ID de demande
-  static Future<Map<String, dynamic>?> getRideByRequestId(String requestId) async {
+  static Future<Map<String, dynamic>?> getRideByRequestId(
+    String requestId,
+  ) async {
     try {
-      final response = await _client
-          .from('ride_requests')
-          .select('''
+      final response =
+          await _client
+              .from('ride_requests')
+              .select('''
             ride_id,
             rides!inner(
               *,
@@ -196,16 +212,16 @@ class SupabaseService {
               driver:profiles!rides_driver_id_fkey(full_name, phone)
             )
           ''')
-          .eq('id', requestId)
-          .single();
-      
+              .eq('id', requestId)
+              .single();
+
       return response['rides'];
     } catch (e) {
       print('Erreur lors de la récupération du trajet par demande: $e');
       return null;
     }
   }
-  
+
   // Recherche de chauffeurs
   static Future<List<Map<String, dynamic>>> findNearbyDrivers({
     required double pickupLat,
@@ -214,13 +230,16 @@ class SupabaseService {
     int maxDrivers = 10,
   }) async {
     try {
-      final response = await _client.rpc('find_nearby_drivers', params: {
-        'pickup_lat': pickupLat,
-        'pickup_lon': pickupLon,
-        'radius_km': radiusKm,
-        'max_drivers': maxDrivers,
-      });
-      
+      final response = await _client.rpc(
+        'find_nearby_drivers',
+        params: {
+          'pickup_lat': pickupLat,
+          'pickup_lon': pickupLon,
+          'radius_km': radiusKm,
+          'max_drivers': maxDrivers,
+        },
+      );
+
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       print('Erreur lors de la recherche de chauffeurs: $e');
@@ -232,7 +251,7 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> getDriverRideRequests() async {
     final user = _client.auth.currentUser;
     if (user == null) throw Exception('User not authenticated');
-    
+
     try {
       final response = await _client
           .from('ride_requests')
@@ -247,7 +266,7 @@ class SupabaseService {
           .eq('status', 'sent')
           .gt('expires_at', DateTime.now().toIso8601String())
           .order('sent_at', ascending: false);
-      
+
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       print('Erreur lors de la récupération des demandes: $e');
@@ -261,21 +280,22 @@ class SupabaseService {
 
     try {
       // Récupérer les détails de la demande
-      final requestData = await _client
-          .from('ride_requests')
-          .select('ride_id')
-          .eq('id', requestId)
-          .eq('driver_id', user.id)
-          .single();
+      final requestData =
+          await _client
+              .from('ride_requests')
+              .select('ride_id')
+              .eq('id', requestId)
+              .eq('driver_id', user.id)
+              .single();
 
       final rideId = requestData['ride_id'];
 
       // Utiliser la fonction accept_ride
-      final result = await _client.rpc('accept_ride', params: {
-        'p_ride_id': rideId,
-        'p_driver_id': user.id,
-      });
-      
+      final result = await _client.rpc(
+        'accept_ride',
+        params: {'p_ride_id': rideId, 'p_driver_id': user.id},
+      );
+
       return result as bool;
     } catch (e) {
       print('Erreur lors de l\'acceptation: $e');
@@ -307,19 +327,17 @@ class SupabaseService {
     if (user == null) throw Exception('User not authenticated');
 
     try {
-      await _client
-          .from('driver_locations')
-          .upsert({
-            'driver_id': user.id,
-            'is_available': isAvailable,
-            'last_updated': DateTime.now().toIso8601String(),
-          });
+      await _client.from('driver_locations').upsert({
+        'driver_id': user.id,
+        'is_available': isAvailable,
+        'last_updated': DateTime.now().toIso8601String(),
+      });
     } catch (e) {
       print('Erreur lors de la mise à jour de disponibilité: $e');
       rethrow;
     }
   }
-  
+
   // Géolocalisation
   static Future<Position> getCurrentLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -334,7 +352,7 @@ class SupabaseService {
         throw Exception('Location permissions are denied');
       }
     }
-    
+
     if (permission == LocationPermission.deniedForever) {
       throw Exception('Location permissions are permanently denied');
     }
@@ -343,7 +361,7 @@ class SupabaseService {
       desiredAccuracy: LocationAccuracy.high,
     );
   }
-  
+
   // Calcul de distance
   static double calculateDistance(
     double startLatitude,
@@ -352,11 +370,12 @@ class SupabaseService {
     double endLongitude,
   ) {
     return Geolocator.distanceBetween(
-      startLatitude,
-      startLongitude,
-      endLatitude,
-      endLongitude,
-    ) / 1000; // Retourne en kilomètres
+          startLatitude,
+          startLongitude,
+          endLatitude,
+          endLongitude,
+        ) /
+        1000; // Retourne en kilomètres
   }
 
   // Envoyer une notification

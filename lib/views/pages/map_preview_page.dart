@@ -4,6 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../controllers/ride_controller.dart';
 import '../../theme/app_colors.dart';
 import 'ride_tracking_page.dart';
+import '../../services/supabase_service.dart';
 
 class MapPreviewPage extends StatefulWidget {
   final double pickupLat;
@@ -45,6 +46,26 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
   @override
   void initState() {
     super.initState();
+
+    // Vérifier l'état d'authentification
+    final user = SupabaseService.client.auth.currentUser;
+    if (user == null) {
+      print('⚠️ Utilisateur non connecté sur la page d\'aperçu');
+      Get.snackbar(
+        'Connexion requise',
+        'Vous devez être connecté pour créer un trajet',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+      // Rediriger vers la page de connexion
+      Future.delayed(const Duration(seconds: 2), () {
+        Get.offAllNamed('/login'); // ou la route appropriée
+      });
+      return;
+    }
+
+    print('✅ Utilisateur connecté: ${user.email}');
     _initializeMap();
     _loadNearbyDrivers();
   }
@@ -145,12 +166,27 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
 
   Future<void> _startRideSearch() async {
     if (_isCreatingRide) return;
-    
+
     setState(() {
       _isCreatingRide = true;
     });
-    
+
     try {
+      // Vérifier si l'utilisateur est connecté
+      final user = SupabaseService.client.auth.currentUser;
+      if (user == null) {
+        throw Exception('Vous devez être connecté pour créer un trajet');
+      }
+
+      print('🚀 Début de création du trajet...');
+      print(
+        '📍 Départ: ${widget.pickupAddress} (${widget.pickupLat}, ${widget.pickupLon})',
+      );
+      print(
+        '🎯 Destination: ${widget.destinationAddress} (${widget.destinationLat}, ${widget.destinationLon})',
+      );
+      print('💳 Paiement: ${widget.paymentMethod}');
+
       // Créer le trajet et démarrer la recherche
       await rideController.createRide(
         pickupLat: widget.pickupLat,
@@ -164,16 +200,22 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
         scheduledFor: widget.scheduledFor,
       );
 
+      print('✅ Trajet créé avec succès!');
+
       if (rideController.currentRide.value != null) {
         // Naviguer vers la page de suivi
         Get.off(() => const RideTrackingPage());
+      } else {
+        throw Exception('Le trajet a été créé mais n\'a pas pu être récupéré');
       }
     } catch (e) {
+      print('❌ Erreur lors de la création du trajet: $e');
       Get.snackbar(
         'Erreur',
         'Impossible de créer le trajet: $e',
         backgroundColor: Colors.red,
         colorText: Colors.white,
+        duration: const Duration(seconds: 5),
       );
     } finally {
       setState(() {
@@ -447,7 +489,12 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
             left: 0,
             right: 0,
             child: Container(
-              padding: const EdgeInsets.only(top: 50, left: 16, right: 16, bottom: 16),
+              padding: const EdgeInsets.only(
+                top: 50,
+                left: 16,
+                right: 16,
+                bottom: 16,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.secondary.withOpacity(0.9),
               ),
@@ -561,24 +608,25 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: _isCreatingRide
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
+                      child:
+                          _isCreatingRide
+                              ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                  strokeWidth: 2,
                                 ),
-                                strokeWidth: 2,
+                              )
+                              : const Text(
+                                'Confirmer le trajet',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            )
-                          : const Text(
-                              'Confirmer le trajet',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
                     ),
                   ),
                 ],
