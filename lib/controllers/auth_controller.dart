@@ -6,6 +6,7 @@ import '../models/ride_model.dart';
 import '../views/home_view.dart';
 import '../views/pages/login_page.dart';
 import '../views/pages/onboarding_page.dart';
+import 'package:flutter/material.dart';
 
 class AuthController extends GetxController {
   final Rx<User?> user = Rx<User?>(null);
@@ -69,7 +70,7 @@ class AuthController extends GetxController {
       final profile = await SupabaseService.getCurrentUserProfile();
       if (profile != null) {
         userProfile.value = UserProfile.fromJson(profile);
-        
+
         // Navigate to home view after profile is loaded
         Get.offAll(() => const HomeView());
       }
@@ -87,6 +88,7 @@ class AuthController extends GetxController {
   }) async {
     try {
       isLoading.value = true;
+      print('🚀 Début de l\'inscription dans AuthController');
 
       final response = await SupabaseService.signUp(
         email: email,
@@ -97,21 +99,82 @@ class AuthController extends GetxController {
       );
 
       if (response.user != null) {
-        Get.snackbar(
-          'Inscription réussie',
-          'Votre compte a été créé avec succès',
-          duration: const Duration(seconds: 3),
-        );
-        return true;
+        print('✅ Inscription réussie, utilisateur créé');
+
+        // Attendre un peu pour que le profil soit créé
+        await Future.delayed(const Duration(seconds: 2));
+
+        // Vérifier si le profil a été créé
+        try {
+          final profile = await SupabaseService.getCurrentUserProfile();
+          if (profile != null) {
+            print('✅ Profil trouvé, navigation vers la page d\'accueil');
+            userProfile.value = UserProfile.fromJson(profile);
+            Get.snackbar(
+              'Inscription réussie',
+              'Votre compte a été créé avec succès',
+              duration: const Duration(seconds: 3),
+              backgroundColor: Colors.green,
+              colorText: Colors.white,
+            );
+            return true;
+          } else {
+            print('⚠️ Profil non trouvé après inscription');
+            Get.snackbar(
+              'Inscription partielle',
+              'Compte créé mais profil non trouvé. Veuillez vous reconnecter.',
+              duration: const Duration(seconds: 5),
+              backgroundColor: Colors.orange,
+              colorText: Colors.white,
+            );
+            return false;
+          }
+        } catch (e) {
+          print('❌ Erreur lors de la vérification du profil: $e');
+          Get.snackbar(
+            'Inscription partielle',
+            'Compte créé mais erreur lors de la vérification du profil.',
+            duration: const Duration(seconds: 5),
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+          );
+          return false;
+        }
       } else {
+        print('❌ Aucun utilisateur créé');
         Get.snackbar(
           'Erreur',
-          response.session?.toString() ?? 'Erreur lors de l\'inscription',
+          'Aucun utilisateur créé lors de l\'inscription',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
         );
         return false;
       }
     } catch (e) {
-      Get.snackbar('Erreur', 'Erreur lors de l\'inscription: $e');
+      print('❌ Erreur dans AuthController.signUp: $e');
+
+      String errorMessage = 'Erreur lors de l\'inscription';
+
+      if (e.toString().contains('Un compte avec cet email existe déjà')) {
+        errorMessage = 'Un compte avec cet email existe déjà';
+      } else if (e.toString().contains('Format d\'email invalide')) {
+        errorMessage = 'Format d\'email invalide';
+      } else if (e.toString().contains('Le mot de passe doit contenir')) {
+        errorMessage = 'Le mot de passe doit contenir au moins 6 caractères';
+      } else if (e.toString().contains('Numéro de téléphone')) {
+        errorMessage = 'Numéro de téléphone invalide ou déjà utilisé';
+      } else if (e.toString().contains('network')) {
+        errorMessage =
+            'Erreur de connexion réseau. Vérifiez votre connexion internet.';
+      }
+
+      Get.snackbar(
+        'Erreur',
+        errorMessage,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
       return false;
     } finally {
       isLoading.value = false;

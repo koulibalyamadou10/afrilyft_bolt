@@ -4,6 +4,7 @@ import '../models/ride_model.dart';
 import '../services/supabase_service.dart';
 import '../services/realtime_service.dart';
 import 'dart:math';
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 class RideController extends GetxController {
@@ -13,6 +14,8 @@ class RideController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxBool isSearchingDriver = false.obs;
   final Rx<Position?> currentLocation = Rx<Position?>(null);
+  final RxInt timeRemaining = 120.obs; // 2 minutes en secondes
+  Timer? _timeoutTimer;
 
   @override
   void onInit() {
@@ -24,6 +27,7 @@ class RideController extends GetxController {
 
   @override
   void onClose() {
+    _timeoutTimer?.cancel();
     RealtimeService.cleanup();
     super.dispose();
   }
@@ -42,10 +46,24 @@ class RideController extends GetxController {
         // Si le trajet a été accepté, arrêter la recherche
         if (ride.status == RideStatus.accepted) {
           isSearchingDriver.value = false;
+          _timeoutTimer?.cancel();
           Get.snackbar(
             '🚗 Chauffeur trouvé !',
             'Un chauffeur a accepté votre demande',
             duration: const Duration(seconds: 3),
+          );
+        }
+
+        // Si le trajet a été annulé, arrêter la recherche
+        if (ride.status == RideStatus.cancelled) {
+          isSearchingDriver.value = false;
+          _timeoutTimer?.cancel();
+          Get.snackbar(
+            '⏰ Temps écoulé',
+            'Aucun chauffeur n\'a accepté votre demande dans les 2 minutes. Le trajet a été annulé automatiquement.',
+            duration: const Duration(seconds: 5),
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
           );
         }
       }
@@ -212,7 +230,10 @@ class RideController extends GetxController {
         throw Exception('Le trajet a été créé mais n\'a pas pu être récupéré');
       }
 
-      // 3. Afficher le message de confirmation
+      // 3. Démarrer le timer de timeout
+      _startTimeoutTimer(rideId);
+
+      // 4. Afficher le message de confirmation
       Get.snackbar(
         'Recherche lancée',
         '${nearbyDrivers.length} chauffeurs ont été notifiés. En attente d\'acceptation...',
@@ -288,6 +309,7 @@ class RideController extends GetxController {
         currentRide.value = null;
         isSearchingDriver.value = false;
         nearbyDrivers.clear();
+        _timeoutTimer?.cancel();
         Get.snackbar('Trajet annulé', 'Votre trajet a été annulé');
       } catch (e) {
         Get.snackbar('Erreur', 'Impossible d\'annuler le trajet: $e');
@@ -330,6 +352,62 @@ class RideController extends GetxController {
     currentRide.value = null;
     isSearchingDriver.value = false;
     nearbyDrivers.clear();
+    _timeoutTimer?.cancel();
+  }
+
+  // NOUVELLE: Démarrer le timer de timeout pour un trajet
+  void _startTimeoutTimer(String rideId) {
+    _timeoutTimer?.cancel();
+
+    // Initialiser le temps restant
+    timeRemaining.value = 120; // 2 minutes
+
+    _timeoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      if (timeRemaining.value > 0) {
+        timeRemaining.value--;
+      } else {
+        // Temps écoulé, vérifier et annuler le trajet
+        timer.cancel();
+        await _handleTimeout(rideId);
+      }
+    });
+  }
+
+  // NOUVELLE: Gérer le timeout d'un trajet
+  Future<void> _handleTimeout(String rideId) async {
+    try {
+      print('⏰ Timeout atteint pour le trajet: $rideId');
+
+      // Vérifier et annuler le trajet dans la base de données
+      final wasCancelled = await SupabaseService.checkAndCancelExpiredRide(
+        rideId,
+      );
+
+      if (wasCancelled) {
+        print('✅ Trajet annulé automatiquement: $rideId');
+
+        // Mettre à jour le statut local
+        if (currentRide.value?.id == rideId) {
+          // Recharger le trajet depuis la base de données pour avoir le statut mis à jour
+          final updatedRideData = await SupabaseService.getRideById(rideId);
+          if (updatedRideData != null) {
+            currentRide.value = RideModel.fromJson(updatedRideData);
+          }
+          isSearchingDriver.value = false;
+        }
+
+        // Afficher la notification
+        Get.snackbar(
+          '⏰ Temps écoulé',
+          'Aucun chauffeur n\'a accepté votre demande dans les 2 minutes. Le trajet a été annulé automatiquement.',
+          duration: const Duration(seconds: 5),
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la gestion du timeout: $e');
+    }
   }
 
   String getStatusText(RideStatus status) {

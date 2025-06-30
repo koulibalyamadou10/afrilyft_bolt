@@ -147,12 +147,23 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
               markerId: MarkerId('driver_${driver.id}'),
               position: LatLng(driver.lat, driver.lon),
               icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueBlue,
+                BitmapDescriptor
+                    .hueGreen, // Couleur verte pour les chauffeurs disponibles
               ),
+              // Rendre le marqueur plus visible
+              zIndex: 1000,
+              visible: true,
               infoWindow: InfoWindow(
-                title: 'Chauffeur disponible',
-                snippet: 'ID: ${driver.driverId}',
+                title: '🚗 Chauffeur disponible',
+                snippet:
+                    'Distance: ${_calculateDriverDistance(driver).toStringAsFixed(1)} km\nCliquez pour plus d\'informations',
               ),
+              // Animation pour attirer l'attention
+              flat: true,
+              rotation: 0,
+              onTap: () => _showDriverPopup(driver), // NOUVEAU: Gestion du clic
+              // Effet de pulsation pour attirer l'attention
+              consumeTapEvents: true,
             );
           }).toSet();
 
@@ -161,6 +172,233 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
       });
     } catch (e) {
       print('Erreur lors de l\'ajout des marqueurs des chauffeurs: $e');
+    }
+  }
+
+  // Calculer la distance entre le point de départ et un chauffeur
+  double _calculateDriverDistance(dynamic driver) {
+    return rideController.calculateDistance(
+      widget.pickupLat,
+      widget.pickupLon,
+      driver.lat,
+      driver.lon,
+    );
+  }
+
+  // NOUVELLE: Afficher le popup avec les informations du chauffeur
+  void _showDriverPopup(dynamic driver) {
+    final distance = _calculateDriverDistance(driver);
+
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // En-tête avec icône de voiture
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.directions_car,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Chauffeur disponible',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green[700],
+                            ),
+                          ),
+                          Text(
+                            'ID: ${driver.driverId.substring(0, 8)}...',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Informations détaillées
+              _buildDriverInfoRow(
+                Icons.location_on,
+                'Position',
+                '${driver.lat.toStringAsFixed(4)}, ${driver.lon.toStringAsFixed(4)}',
+              ),
+
+              const SizedBox(height: 12),
+
+              _buildDriverInfoRow(
+                Icons.straighten,
+                'Distance',
+                '${distance.toStringAsFixed(1)} km de votre position',
+              ),
+
+              const SizedBox(height: 12),
+
+              _buildDriverInfoRow(
+                Icons.access_time,
+                'Dernière mise à jour',
+                _formatLastUpdated(driver.lastUpdated),
+              ),
+
+              if (driver.heading != null) ...[
+                const SizedBox(height: 12),
+                _buildDriverInfoRow(
+                  Icons.compass_calibration,
+                  'Direction',
+                  '${driver.heading.toStringAsFixed(0)}°',
+                ),
+              ],
+
+              if (driver.speed != null) ...[
+                const SizedBox(height: 12),
+                _buildDriverInfoRow(
+                  Icons.speed,
+                  'Vitesse',
+                  '${driver.speed.toStringAsFixed(1)} km/h',
+                ),
+              ],
+
+              const SizedBox(height: 20),
+
+              // Boutons d'action
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Get.back(),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      child: Text(
+                        'Fermer',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Get.back();
+                        _startRideSearch();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Choisir ce chauffeur',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: true,
+    );
+  }
+
+  // NOUVELLE: Construire une ligne d'information du chauffeur
+  Widget _buildDriverInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.grey[600], size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[500],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // NOUVELLE: Formater la dernière mise à jour
+  String _formatLastUpdated(DateTime lastUpdated) {
+    final now = DateTime.now();
+    final difference = now.difference(lastUpdated);
+
+    if (difference.inMinutes < 1) {
+      return 'À l\'instant';
+    } else if (difference.inMinutes < 60) {
+      return 'Il y a ${difference.inMinutes} min';
+    } else if (difference.inHours < 24) {
+      return 'Il y a ${difference.inHours} h';
+    } else {
+      return 'Il y a ${difference.inDays} jour(s)';
     }
   }
 
@@ -389,6 +627,18 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
     );
   }
 
+  // NOUVELLE: Méthode pour construire un élément de légende
+  Widget _buildLegendItem(IconData icon, Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 16),
+        const SizedBox(width: 6),
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+      ],
+    );
+  }
+
   Widget _buildStaticMarker(IconData icon, Color color, String label) {
     return Column(
       children: [
@@ -504,18 +754,110 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
                     icon: const Icon(Icons.arrow_back, color: Colors.white),
                     onPressed: () => Get.back(),
                   ),
-                  const Expanded(
-                    child: Text(
-                      'Aperçu du trajet',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Aperçu du trajet',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Obx(() {
+                          final driverCount =
+                              rideController.nearbyDrivers.length;
+                          if (driverCount > 0) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.8),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.directions_car,
+                                    color: Colors.white,
+                                    size: 12,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$driverCount disponible${driverCount > 1 ? 's' : ''}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        }),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 48), // Pour équilibrer le bouton retour
+                ],
+              ),
+            ),
+          ),
+
+          // Légende des marqueurs
+          Positioned(
+            top: 120,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.95),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Légende',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildLegendItem(
+                    Icons.radio_button_checked,
+                    Colors.green,
+                    'Départ',
+                  ),
+                  const SizedBox(height: 4),
+                  _buildLegendItem(
+                    Icons.location_on,
+                    Colors.red,
+                    'Destination',
+                  ),
+                  const SizedBox(height: 4),
+                  _buildLegendItem(
+                    Icons.directions_car,
+                    Colors.green,
+                    'Chauffeur',
+                  ),
                 ],
               ),
             ),
@@ -593,6 +935,10 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+
+                  // Section des chauffeurs disponibles
+                  Obx(() => _buildAvailableDriversSection()),
                   const SizedBox(height: 20),
 
                   // Bouton de confirmation
@@ -699,6 +1045,154 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
           ),
         ),
       ],
+    );
+  }
+
+  // NOUVELLE: Section des chauffeurs disponibles
+  Widget _buildAvailableDriversSection() {
+    final drivers = rideController.nearbyDrivers;
+
+    if (drivers.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.directions_car, color: Colors.orange, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Aucun chauffeur disponible',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.orange[700],
+                    ),
+                  ),
+                  Text(
+                    'Nous chercherons des chauffeurs quand vous confirmerez',
+                    style: TextStyle(fontSize: 12, color: Colors.orange[600]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.directions_car, color: Colors.green, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                '${drivers.length} chauffeur${drivers.length > 1 ? 's' : ''} disponible${drivers.length > 1 ? 's' : ''}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.green[700],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Liste des chauffeurs (limité à 3 pour l'aperçu)
+          ...drivers.take(3).map((driver) {
+            final distance = _calculateDriverDistance(driver);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.directions_car,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Chauffeur ${driver.driverId.substring(0, 8)}...',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          'À ${distance.toStringAsFixed(1)} km',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Disponible',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+
+          // Message si plus de 3 chauffeurs
+          if (drivers.length > 3)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Et ${drivers.length - 3} autre${drivers.length - 3 > 1 ? 's' : ''} chauffeur${drivers.length - 3 > 1 ? 's' : ''} à proximité',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.green[600],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -15,16 +15,90 @@ class SupabaseService {
     String role = 'customer',
   }) async {
     try {
+      print('🔍 Début de l\'inscription avec les données:');
+      print('📧 Email: $email');
+      print('👤 Nom: $fullName');
+      print('📱 Téléphone: $phone');
+      print('🎭 Rôle: $role');
+
       final response = await _client.auth.signUp(
         email: email,
         password: password,
         data: {'full_name': fullName, 'phone': phone, 'role': role},
       );
 
+      print('✅ Réponse de Supabase Auth:');
+      print('👤 Utilisateur créé: ${response.user != null}');
+      print('📧 Email confirmé: ${response.user?.emailConfirmedAt != null}');
+      print('🔑 Session: ${response.session != null}');
+
+      if (response.user != null) {
+        print('✅ Utilisateur créé avec succès, ID: ${response.user!.id}');
+
+        // Vérifier si le profil a été créé automatiquement
+        try {
+          final profile = await getCurrentUserProfile();
+          if (profile != null) {
+            print('✅ Profil créé automatiquement');
+          } else {
+            print('⚠️ Profil non trouvé, création manuelle nécessaire');
+            // Créer le profil manuellement si le trigger n'a pas fonctionné
+            await _createProfileManually(response.user!, fullName, phone, role);
+          }
+        } catch (e) {
+          print('❌ Erreur lors de la vérification du profil: $e');
+          // Créer le profil manuellement
+          await _createProfileManually(response.user!, fullName, phone, role);
+        }
+      } else {
+        print('❌ Aucun utilisateur créé dans la réponse');
+      }
+
       return response;
     } catch (e) {
-      print('Erreur lors de l\'inscription: $e');
+      print('❌ Erreur lors de l\'inscription: $e');
+      print('🔍 Type d\'erreur: ${e.runtimeType}');
+
+      // Gérer les erreurs spécifiques
+      if (e.toString().contains('User already registered')) {
+        throw Exception('Un compte avec cet email existe déjà');
+      } else if (e.toString().contains('Invalid email')) {
+        throw Exception('Format d\'email invalide');
+      } else if (e.toString().contains('Password should be at least')) {
+        throw Exception('Le mot de passe doit contenir au moins 6 caractères');
+      } else if (e.toString().contains('phone')) {
+        throw Exception('Numéro de téléphone invalide ou déjà utilisé');
+      }
+
       rethrow;
+    }
+  }
+
+  // Méthode pour créer le profil manuellement si le trigger échoue
+  static Future<void> _createProfileManually(
+    User user,
+    String fullName,
+    String phone,
+    String role,
+  ) async {
+    try {
+      print('🔧 Création manuelle du profil pour l\'utilisateur: ${user.id}');
+
+      final profileData = {
+        'id': user.id,
+        'email': user.email,
+        'full_name': fullName,
+        'phone': phone,
+        'role': role,
+        'is_active': true,
+        'is_verified': false,
+      };
+
+      await _client.from('profiles').insert(profileData);
+      print('✅ Profil créé manuellement avec succès');
+    } catch (e) {
+      print('❌ Erreur lors de la création manuelle du profil: $e');
+      throw Exception('Erreur lors de la création du profil: $e');
     }
   }
 
@@ -314,6 +388,48 @@ class SupabaseService {
       return response['rides'];
     } catch (e) {
       print('Erreur lors de la récupération du trajet par demande: $e');
+      return null;
+    }
+  }
+
+  // NOUVELLE: Fonction pour vérifier et annuler un trajet expiré
+  static Future<bool> checkAndCancelExpiredRide(String rideId) async {
+    try {
+      final result = await _client.rpc(
+        'check_and_cancel_ride_if_expired',
+        params: {'p_ride_id': rideId},
+      );
+
+      return result as bool;
+    } catch (e) {
+      print('Erreur lors de la vérification d\'expiration du trajet: $e');
+      return false;
+    }
+  }
+
+  // NOUVELLE: Fonction pour obtenir le temps restant avant expiration
+  static Future<int?> getRideTimeRemaining(String rideId) async {
+    try {
+      final response =
+          await _client
+              .from('rides')
+              .select('created_at')
+              .eq('id', rideId)
+              .eq('status', 'searching')
+              .single();
+
+      if (response != null) {
+        final createdAt = DateTime.parse(response['created_at']);
+        final now = DateTime.now();
+        final elapsed = now.difference(createdAt);
+        final remaining = const Duration(minutes: 2) - elapsed;
+
+        return remaining.inSeconds > 0 ? remaining.inSeconds : 0;
+      }
+
+      return null;
+    } catch (e) {
+      print('Erreur lors du calcul du temps restant: $e');
       return null;
     }
   }

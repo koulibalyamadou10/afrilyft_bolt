@@ -580,10 +580,20 @@ class _RideTrackingPageState extends State<RideTrackingPage>
               style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Les chauffeurs ont 2 minutes pour répondre',
-              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-            ),
+            Obx(() {
+              final remaining = rideController.timeRemaining.value;
+              final minutes = remaining ~/ 60;
+              final seconds = remaining % 60;
+              return Text(
+                'Temps restant: ${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: remaining <= 30 ? Colors.red : Colors.grey[500],
+                  fontWeight:
+                      remaining <= 30 ? FontWeight.bold : FontWeight.normal,
+                ),
+              );
+            }),
           ],
         ),
       ),

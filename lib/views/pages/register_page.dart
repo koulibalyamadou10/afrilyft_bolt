@@ -42,6 +42,8 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     if (_formKey.currentState!.validate()) {
+      print('📝 Début de l\'inscription depuis la page');
+
       final success = await authController.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -50,7 +52,12 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       if (success) {
-        Get.offAll(() => const LoginPage());
+        print('✅ Inscription réussie, navigation vers la page d\'accueil');
+        // Ne pas naviguer vers LoginPage, laisser AuthController gérer la navigation
+        // Get.offAll(() => const LoginPage());
+      } else {
+        print('❌ Échec de l\'inscription');
+        // Rester sur la page d'inscription pour permettre à l'utilisateur de corriger
       }
     }
   }
@@ -73,9 +80,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     icon: const Icon(Icons.arrow_back, color: Colors.black54),
                     onPressed: () => Get.back(),
                   ),
-                  
+
                   const SizedBox(height: 20),
-                  
+
                   // Titre et sous-titre
                   const Text(
                     'Créer un compte',
@@ -88,14 +95,11 @@ class _RegisterPageState extends State<RegisterPage> {
                   const SizedBox(height: 8),
                   const Text(
                     'Remplissez le formulaire pour continuer',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.black54,
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.black54),
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // Nom complet
                   const Text(
                     'Nom complet',
@@ -129,9 +133,9 @@ class _RegisterPageState extends State<RegisterPage> {
                       contentPadding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Numéro de téléphone
                   const Text(
                     'Numéro de téléphone',
@@ -149,8 +153,12 @@ class _RegisterPageState extends State<RegisterPage> {
                       if (value == null || value.isEmpty) {
                         return 'Veuillez entrer votre numéro de téléphone';
                       }
-                      if (value.length < 8) {
-                        return 'Numéro de téléphone invalide';
+                      // Validation plus stricte pour le numéro de téléphone
+                      final phoneRegex = RegExp(
+                        r'^(\+?[0-9]{1,4}[\s-]?)?[0-9]{8,15}$',
+                      );
+                      if (!phoneRegex.hasMatch(value.trim())) {
+                        return 'Format de numéro de téléphone invalide';
                       }
                       return null;
                     },
@@ -166,9 +174,9 @@ class _RegisterPageState extends State<RegisterPage> {
                       contentPadding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Email
                   const Text(
                     'Email',
@@ -203,9 +211,9 @@ class _RegisterPageState extends State<RegisterPage> {
                       contentPadding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Mot de passe
                   const Text(
                     'Mot de passe',
@@ -226,6 +234,10 @@ class _RegisterPageState extends State<RegisterPage> {
                       if (value.length < 6) {
                         return 'Le mot de passe doit contenir au moins 6 caractères';
                       }
+                      // Validation plus stricte pour le mot de passe
+                      if (!RegExp(r'^(?=.*[a-zA-Z])(?=.*\d)').hasMatch(value)) {
+                        return 'Le mot de passe doit contenir au moins une lettre et un chiffre';
+                      }
                       return null;
                     },
                     decoration: InputDecoration(
@@ -233,7 +245,9 @@ class _RegisterPageState extends State<RegisterPage> {
                       prefixIcon: const Icon(Icons.lock, color: Colors.grey),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                          _obscurePassword
+                              ? Icons.visibility
+                              : Icons.visibility_off,
                           color: Colors.grey,
                         ),
                         onPressed: () {
@@ -251,9 +265,9 @@ class _RegisterPageState extends State<RegisterPage> {
                       contentPadding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Conditions d'utilisation
                   Row(
                     children: [
@@ -284,24 +298,24 @@ class _RegisterPageState extends State<RegisterPage> {
                                   color: Color(0xFFFF6B5B),
                                   fontWeight: FontWeight.w500,
                                 ),
-                                recognizer: TapGestureRecognizer()
-                                  ..onTap = () {
-                                    // Navigation vers les conditions d'utilisation
-                                  },
+                                recognizer:
+                                    TapGestureRecognizer()
+                                      ..onTap = () {
+                                        // Navigation vers les conditions d'utilisation
+                                      },
                               ),
-                              const TextSpan(
-                                text: ' et la ',
-                              ),
+                              const TextSpan(text: ' et la '),
                               TextSpan(
                                 text: 'Politique de confidentialité',
                                 style: const TextStyle(
                                   color: Color(0xFFFF6B5B),
                                   fontWeight: FontWeight.w500,
                                 ),
-                                recognizer: TapGestureRecognizer()
-                                  ..onTap = () {
-                                    // Navigation vers la politique de confidentialité
-                                  },
+                                recognizer:
+                                    TapGestureRecognizer()
+                                      ..onTap = () {
+                                        // Navigation vers la politique de confidentialité
+                                      },
                               ),
                             ],
                           ),
@@ -309,49 +323,54 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // Bouton d'inscription
-                  Obx(() => SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: authController.isLoading.value ? null : _handleRegister,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF6B5B),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  Obx(
+                    () => SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed:
+                            authController.isLoading.value
+                                ? null
+                                : _handleRegister,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF6B5B),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          disabledBackgroundColor: Colors.grey[300],
                         ),
-                        disabledBackgroundColor: Colors.grey[300],
+                        child:
+                            authController.isLoading.value
+                                ? const CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                )
+                                : const Text(
+                                  'S\'inscrire',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                  ),
+                                ),
                       ),
-                      child: authController.isLoading.value
-                          ? const CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            )
-                          : const Text(
-                              'S\'inscrire',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.white,
-                              ),
-                            ),
                     ),
-                  )),
-                  
+                  ),
+
                   const SizedBox(height: 24),
-                  
+
                   // Lien vers la page de connexion
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
                         'Déjà un compte ?',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.black54),
                       ),
                       TextButton(
                         onPressed: () {

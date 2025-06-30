@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 // import 'package:firebase_core/firebase_core.dart';
 import 'views/pages/splash_screen.dart';
 import 'theme/app_theme.dart';
