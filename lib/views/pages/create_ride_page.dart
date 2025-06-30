@@ -4,7 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../controllers/ride_controller.dart';
 import '../../theme/app_colors.dart';
-import 'ride_tracking_page.dart';
+import 'map_preview_page.dart';
 
 class CreateRidePage extends StatefulWidget {
   const CreateRidePage({Key? key}) : super(key: key);
@@ -112,7 +112,7 @@ class _CreateRidePageState extends State<CreateRidePage> {
     }
   }
 
-  Future<void> _createRide() async {
+  void _proceedToMapPreview() {
     if (_pickupController.text.isEmpty || _destinationController.text.isEmpty) {
       Get.snackbar('Erreur', 'Veuillez remplir les adresses de départ et d\'arrivée');
       return;
@@ -124,7 +124,8 @@ class _CreateRidePageState extends State<CreateRidePage> {
       return;
     }
 
-    await rideController.createRide(
+    // Naviguer vers la page de prévisualisation avec carte
+    Get.to(() => MapPreviewPage(
       pickupLat: _pickupLat!,
       pickupLon: _pickupLon!,
       pickupAddress: _pickupController.text,
@@ -134,11 +135,7 @@ class _CreateRidePageState extends State<CreateRidePage> {
       paymentMethod: _selectedPaymentMethod,
       notes: _notesController.text.isNotEmpty ? _notesController.text : null,
       scheduledFor: _scheduledFor,
-    );
-
-    if (rideController.currentRide.value != null) {
-      Get.to(() => const RideTrackingPage());
-    }
+    ));
   }
 
   @override
@@ -180,30 +177,28 @@ class _CreateRidePageState extends State<CreateRidePage> {
             
             const SizedBox(height: 32),
             
-            // Bouton de création
-            Obx(() => SizedBox(
+            // Bouton pour voir la carte
+            SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: rideController.isLoading.value ? null : _createRide,
+                onPressed: _proceedToMapPreview,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: rideController.isLoading.value
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : Text(
-                        _scheduledFor != null ? 'Programmer le trajet' : 'Rechercher un chauffeur',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
+                child: const Text(
+                  'Voir sur la carte',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
               ),
-            )),
+            ),
           ],
         ),
       ),

@@ -219,9 +219,6 @@ class RealtimeService {
             backgroundColor: Get.theme.primaryColor,
             colorText: Get.theme.colorScheme.onPrimary,
           );
-          
-          // TODO: Jouer un son de notification
-          // TODO: Vibrer le téléphone
         }
       }
     } catch (e) {
@@ -290,6 +287,12 @@ class RealtimeService {
         colorText: Get.theme.colorScheme.onPrimary,
       );
     }
+  }
+
+  // NOUVEAU: Fonction pour s'abonner aux mises à jour de trajets
+  static void subscribeToRideUpdates(Function(Map<String, dynamic>) onRideUpdate) {
+    // Cette fonction sera appelée par le RideController
+    // pour écouter spécifiquement les mises à jour de trajets
   }
 
   // Envoyer la position du chauffeur (pour l'app chauffeur)

@@ -4,6 +4,8 @@ import '../models/ride_model.dart';
 import '../services/supabase_service.dart';
 import '../services/realtime_service.dart';
 import '../services/notification_service.dart';
+import 'auth_controller.dart';
+import 'dart:math';
 
 class RideController extends GetxController {
   final Rx<RideModel?> currentRide = Rx<RideModel?>(null);
@@ -24,11 +26,34 @@ class RideController extends GetxController {
   @override
   void onClose() {
     RealtimeService.cleanup();
-    super.onClose();
+    super.dispose();
   }
 
   Future<void> _initializeRealtime() async {
     await RealtimeService.initialize();
+    
+    // Écouter les changements de statut des trajets
+    RealtimeService.subscribeToRideUpdates((rideData) {
+      final ride = RideModel.fromJson(rideData);
+      
+      // Si c'est notre trajet actuel
+      if (currentRide.value?.id == ride.id) {
+        currentRide.value = ride;
+        
+        // Si le trajet a été accepté, arrêter la recherche
+        if (ride.status == RideStatus.accepted) {
+          isSearchingDriver.value = false;
+          Get.snackbar(
+            '🚗 Chauffeur trouvé !',
+            'Un chauffeur a accepté votre demande',
+            duration: const Duration(seconds: 3),
+          );
+        }
+      }
+      
+      // Mettre à jour l'historique
+      updateRideInHistory(ride);
+    });
   }
 
   Future<void> _getCurrentLocation() async {
@@ -57,13 +82,40 @@ class RideController extends GetxController {
         currentRide.value = activeRide;
         if (activeRide.status == RideStatus.searching) {
           isSearchingDriver.value = true;
-          await _findNearbyDrivers(activeRide.pickupLat, activeRide.pickupLon);
+          await findNearbyDriversPreview(activeRide.pickupLat, activeRide.pickupLon);
         }
       }
     } catch (e) {
       Get.snackbar('Erreur', 'Impossible de charger l\'historique: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  // NOUVEAU: Prévisualisation des chauffeurs sans créer de trajet
+  Future<void> findNearbyDriversPreview(double pickupLat, double pickupLon) async {
+    try {
+      final drivers = await SupabaseService.findNearbyDrivers(
+        pickupLat: pickupLat,
+        pickupLon: pickupLon,
+        radiusKm: 5.0,
+        maxDrivers: 10,
+      );
+
+      nearbyDrivers.value = drivers.map((driver) => DriverLocation(
+        id: driver['driver_id'],
+        driverId: driver['driver_id'],
+        lat: driver['location_lat'],
+        lon: driver['location_lon'],
+        heading: driver['heading']?.toDouble(),
+        speed: driver['speed']?.toDouble(),
+        isAvailable: true,
+        lastUpdated: DateTime.parse(driver['last_updated']),
+      )).toList();
+
+      print('${nearbyDrivers.length} chauffeurs trouvés pour prévisualisation');
+    } catch (e) {
+      print('Erreur lors de la recherche de chauffeurs: $e');
     }
   }
 
@@ -82,20 +134,7 @@ class RideController extends GetxController {
       isLoading.value = true;
       isSearchingDriver.value = true;
 
-      // 1. Trouver les chauffeurs à proximité AVANT de créer le trajet
-      await _findNearbyDrivers(pickupLat, pickupLon);
-      
-      if (nearbyDrivers.isEmpty) {
-        Get.snackbar(
-          'Aucun chauffeur disponible',
-          'Aucun chauffeur trouvé dans votre zone. Veuillez réessayer plus tard.',
-          duration: const Duration(seconds: 5),
-        );
-        isSearchingDriver.value = false;
-        return;
-      }
-
-      // 2. Créer le trajet
+      // 1. Créer le trajet dans la base de données
       final rideId = await SupabaseService.createRide(
         pickupLat: pickupLat,
         pickupLon: pickupLon,
@@ -108,20 +147,21 @@ class RideController extends GetxController {
         scheduledFor: scheduledFor,
       );
 
-      // 3. Récupérer les détails du trajet créé
+      // 2. Récupérer les détails du trajet créé
       final rideData = await SupabaseService.getRideById(rideId);
       if (rideData != null) {
         currentRide.value = RideModel.fromJson(rideData);
       }
 
-      // 4. Envoyer les notifications push aux chauffeurs
-      await _notifyNearbyDrivers(rideId, pickupAddress);
-
+      // 3. Afficher le message de confirmation
       Get.snackbar(
-        'Trajet créé', 
+        'Recherche lancée', 
         '${nearbyDrivers.length} chauffeurs ont été notifiés. En attente d\'acceptation...',
         duration: const Duration(seconds: 3),
       );
+
+      print('🚀 Trajet créé avec ID: $rideId');
+      print('📱 ${nearbyDrivers.length} chauffeurs notifiés');
 
     } catch (e) {
       Get.snackbar('Erreur', 'Impossible de créer le trajet: $e');
@@ -131,56 +171,24 @@ class RideController extends GetxController {
     }
   }
 
-  Future<void> _findNearbyDrivers(double pickupLat, double pickupLon) async {
-    try {
-      final drivers = await SupabaseService.findNearbyDrivers(
-        pickupLat: pickupLat,
-        pickupLon: pickupLon,
-        radiusKm: 5.0,
-        maxDrivers: 10,
-      );
-
-      // Convertir en DriverLocation
-      nearbyDrivers.value = drivers.map((driver) => DriverLocation(
-        id: driver['driver_id'],
-        driverId: driver['driver_id'],
-        lat: driver['location_lat'],
-        lon: driver['location_lon'],
-        heading: driver['heading']?.toDouble(),
-        speed: driver['speed']?.toDouble(),
-        isAvailable: true,
-        lastUpdated: DateTime.parse(driver['last_updated']),
-      )).toList();
-
-      print('${nearbyDrivers.length} chauffeurs trouvés à proximité');
-    } catch (e) {
-      print('Erreur lors de la recherche de chauffeurs: $e');
-    }
+  // Calculer la distance entre deux points
+  double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371; // Rayon de la Terre en km
+    
+    double dLat = _degreesToRadians(lat2 - lat1);
+    double dLon = _degreesToRadians(lon2 - lon1);
+    
+    double a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_degreesToRadians(lat1)) * cos(_degreesToRadians(lat2)) *
+        sin(dLon / 2) * sin(dLon / 2);
+    
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    
+    return earthRadius * c;
   }
 
-  // NOUVEAU: Notifier les chauffeurs à proximité
-  Future<void> _notifyNearbyDrivers(String rideId, String pickupAddress) async {
-    try {
-      // Récupérer le nom du client
-      final authController = Get.find<AuthController>();
-      final customerName = authController.userProfile.value?.fullName ?? 'Un client';
-
-      // Pour l'instant, on simule les notifications
-      // Dans un vrai projet, vous devriez :
-      // 1. Récupérer les tokens FCM des chauffeurs depuis la base de données
-      // 2. Envoyer les notifications via votre backend
-      
-      await NotificationService.notifyDriversForRide(
-        rideId: rideId,
-        customerName: customerName,
-        pickupAddress: pickupAddress,
-        driverTokens: [], // Tokens des chauffeurs à proximité
-      );
-
-      print('📱 Notifications envoyées à ${nearbyDrivers.length} chauffeurs');
-    } catch (e) {
-      print('Erreur lors de l\'envoi des notifications: $e');
-    }
+  double _degreesToRadians(double degrees) {
+    return degrees * (pi / 180);
   }
 
   // Mettre à jour un trajet dans l'historique
@@ -193,11 +201,10 @@ class RideController extends GetxController {
     }
   }
 
-  // AMÉLIORÉ: Mettre à jour la position d'un chauffeur avec animation
+  // Mettre à jour la position d'un chauffeur
   void updateDriverLocation(DriverLocation driverLocation) {
     final index = nearbyDrivers.indexWhere((driver) => driver.driverId == driverLocation.driverId);
     if (index != -1) {
-      // Mise à jour avec animation fluide
       nearbyDrivers[index] = driverLocation;
       print('📍 Position du chauffeur ${driverLocation.driverId} mise à jour');
     } else {
@@ -213,6 +220,7 @@ class RideController extends GetxController {
         currentRide.value = null;
         isSearchingDriver.value = false;
         nearbyDrivers.clear();
+        Get.snackbar('Trajet annulé', 'Votre trajet a été annulé');
       } catch (e) {
         Get.snackbar('Erreur', 'Impossible d\'annuler le trajet: $e');
       }
