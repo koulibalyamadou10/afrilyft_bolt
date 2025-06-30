@@ -356,13 +356,20 @@ class RealtimeService {
       
       if (userId == null) return false;
 
-      final result = await _client.rpc('update_ride_status', params: {
-        'p_ride_id': rideId,
-        'p_new_status': newStatus,
-        'p_user_id': userId,
+      // Appeler la fonction Edge pour mettre à jour le statut
+      final response = await _client.functions.invoke('ride-status', {
+        body: {
+          rideId: rideId,
+          status: newStatus,
+          userId: userId,
+        },
       });
       
-      return result as bool;
+      if (response.error) {
+        throw Exception(response.error?.message);
+      }
+      
+      return true;
     } catch (e) {
       print('❌ Erreur lors de la mise à jour du statut: $e');
       return false;

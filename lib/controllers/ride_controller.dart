@@ -167,6 +167,7 @@ class RideController extends GetxController {
     } catch (e) {
       Get.snackbar('Erreur', 'Impossible de créer le trajet: $e');
       isSearchingDriver.value = false;
+      throw e; // Propager l'erreur pour que la page puisse la gérer
     } finally {
       isLoading.value = false;
     }

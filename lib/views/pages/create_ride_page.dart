@@ -28,11 +28,93 @@ class _CreateRidePageState extends State<CreateRidePage> {
   bool _isLoadingPickup = false;
   bool _isLoadingDestination = false;
   
-  List<String> _pickupSuggestions = [];
-  List<String> _destinationSuggestions = [];
+  List<Map<String, String>> _pickupSuggestions = [];
+  List<Map<String, String>> _destinationSuggestions = [];
   
   final FocusNode _pickupFocusNode = FocusNode();
   final FocusNode _destinationFocusNode = FocusNode();
+
+  // Liste des villes et lieux populaires en Guinée avec coordonnées
+  final List<Map<String, dynamic>> _popularPlaces = [
+    {
+      'name': 'Conakry, Guinée',
+      'address': 'Conakry, Guinée',
+      'lat': 9.6412,
+      'lon': -13.5784
+    },
+    {
+      'name': 'Aéroport International de Conakry',
+      'address': 'Aéroport International de Conakry, Guinée',
+      'lat': 9.5764,
+      'lon': -13.6121
+    },
+    {
+      'name': 'Port de Conakry',
+      'address': 'Port de Conakry, Guinée',
+      'lat': 9.5142,
+      'lon': -13.7128
+    },
+    {
+      'name': 'Kindia, Guinée',
+      'address': 'Kindia, Guinée',
+      'lat': 10.0569,
+      'lon': -12.8658
+    },
+    {
+      'name': 'Marché de Kindia',
+      'address': 'Marché de Kindia, Guinée',
+      'lat': 10.0532,
+      'lon': -12.8611
+    },
+    {
+      'name': 'Mamou, Guinée',
+      'address': 'Mamou, Guinée',
+      'lat': 10.3755,
+      'lon': -12.0915
+    },
+    {
+      'name': 'Labé, Guinée',
+      'address': 'Labé, Guinée',
+      'lat': 11.3182,
+      'lon': -12.2833
+    },
+    {
+      'name': 'Kankan, Guinée',
+      'address': 'Kankan, Guinée',
+      'lat': 10.3854,
+      'lon': -9.3057
+    },
+    {
+      'name': 'Université de Conakry',
+      'address': 'Université de Conakry, Guinée',
+      'lat': 9.5359,
+      'lon': -13.6801
+    },
+    {
+      'name': 'Hôpital Donka',
+      'address': 'Hôpital Donka, Conakry, Guinée',
+      'lat': 9.5512,
+      'lon': -13.6765
+    },
+    {
+      'name': 'Stade du 28 Septembre',
+      'address': 'Stade du 28 Septembre, Conakry, Guinée',
+      'lat': 9.5387,
+      'lon': -13.6765
+    },
+    {
+      'name': 'Kaloum Centre',
+      'address': 'Kaloum, Conakry, Guinée',
+      'lat': 9.5092,
+      'lon': -13.7122
+    },
+    {
+      'name': 'Marché Madina',
+      'address': 'Marché Madina, Conakry, Guinée',
+      'lat': 9.5452,
+      'lon': -13.6765
+    },
+  ];
 
   @override
   void initState() {
@@ -74,7 +156,7 @@ class _CreateRidePageState extends State<CreateRidePage> {
   }
 
   void _onPickupTextChanged() {
-    if (_pickupController.text.length > 2) {
+    if (_pickupController.text.length > 1) {
       _getAddressSuggestions(_pickupController.text, true);
     } else {
       setState(() {
@@ -84,7 +166,7 @@ class _CreateRidePageState extends State<CreateRidePage> {
   }
 
   void _onDestinationTextChanged() {
-    if (_destinationController.text.length > 2) {
+    if (_destinationController.text.length > 1) {
       _getAddressSuggestions(_destinationController.text, false);
     } else {
       setState(() {
@@ -93,48 +175,23 @@ class _CreateRidePageState extends State<CreateRidePage> {
     }
   }
 
-  Future<void> _getAddressSuggestions(String query, bool isPickup) async {
+  void _getAddressSuggestions(String query, bool isPickup) {
     if (query.isEmpty) return;
     
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 300));
+    // Filtrer les lieux populaires en fonction de la requête
+    final List<Map<String, dynamic>> filteredPlaces = _popularPlaces
+        .where((place) => 
+            place['name'].toLowerCase().contains(query.toLowerCase()) ||
+            place['address'].toLowerCase().contains(query.toLowerCase()))
+        .toList();
     
-    // Mock suggestions based on query
-    List<String> suggestions = [];
-    
-    if (query.toLowerCase().contains('con')) {
-      suggestions.add('Conakry, Guinea');
-      suggestions.add('Conakry International Airport, Guinea');
-      suggestions.add('Conakry Port, Guinea');
-    }
-    
-    if (query.toLowerCase().contains('kin')) {
-      suggestions.add('Kindia, Guinea');
-      suggestions.add('Kindia Market, Guinea');
-      suggestions.add('Kindia Central Station, Guinea');
-    }
-    
-    if (query.toLowerCase().contains('mam')) {
-      suggestions.add('Mamou, Guinea');
-      suggestions.add('Mamou Central, Guinea');
-    }
-    
-    if (query.toLowerCase().contains('lab')) {
-      suggestions.add('Labé, Guinea');
-      suggestions.add('Labé Market, Guinea');
-    }
-    
-    if (query.toLowerCase().contains('kan')) {
-      suggestions.add('Kankan, Guinea');
-      suggestions.add('Kankan University, Guinea');
-    }
-    
-    // Add generic suggestions if no specific matches
-    if (suggestions.isEmpty && query.length > 2) {
-      suggestions.add('$query Street, Guinea');
-      suggestions.add('$query Market, Guinea');
-      suggestions.add('$query District, Guinea');
-    }
+    // Convertir en format de suggestion
+    final suggestions = filteredPlaces.map((place) => {
+      'name': place['name'],
+      'address': place['address'],
+      'lat': place['lat'].toString(),
+      'lon': place['lon'].toString(),
+    }).toList();
     
     setState(() {
       if (isPickup) {
@@ -176,6 +233,21 @@ class _CreateRidePageState extends State<CreateRidePage> {
     }
   }
 
+  void _selectSuggestion(Map<String, String> suggestion, bool isPickup) {
+    if (isPickup) {
+      _pickupController.text = suggestion['address'] ?? suggestion['name'] ?? '';
+      _pickupLat = double.tryParse(suggestion['lat'] ?? '');
+      _pickupLon = double.tryParse(suggestion['lon'] ?? '');
+      _pickupSuggestions = [];
+    } else {
+      _destinationController.text = suggestion['address'] ?? suggestion['name'] ?? '';
+      _destinationLat = double.tryParse(suggestion['lat'] ?? '');
+      _destinationLon = double.tryParse(suggestion['lon'] ?? '');
+      _destinationSuggestions = [];
+    }
+    setState(() {});
+  }
+
   Future<void> _searchLocation(String query, bool isPickup) async {
     if (query.isEmpty) return;
 
@@ -188,6 +260,26 @@ class _CreateRidePageState extends State<CreateRidePage> {
     });
 
     try {
+      // D'abord, chercher dans nos lieux populaires
+      final matchingPlace = _popularPlaces.firstWhereOrNull(
+        (place) => place['name'].toLowerCase() == query.toLowerCase() || 
+                  place['address'].toLowerCase() == query.toLowerCase()
+      );
+      
+      if (matchingPlace != null) {
+        setState(() {
+          if (isPickup) {
+            _pickupLat = matchingPlace['lat'];
+            _pickupLon = matchingPlace['lon'];
+          } else {
+            _destinationLat = matchingPlace['lat'];
+            _destinationLon = matchingPlace['lon'];
+          }
+        });
+        return;
+      }
+      
+      // Si pas trouvé dans nos lieux populaires, utiliser geocoding
       final locations = await locationFromAddress(query);
       if (locations.isNotEmpty) {
         final location = locations.first;
@@ -203,7 +295,20 @@ class _CreateRidePageState extends State<CreateRidePage> {
         });
       }
     } catch (e) {
-      Get.snackbar('Erreur', 'Adresse introuvable: $e');
+      // Si geocoding échoue, utiliser des coordonnées par défaut pour Conakry
+      if (query.toLowerCase().contains('conakry')) {
+        setState(() {
+          if (isPickup) {
+            _pickupLat = 9.6412;
+            _pickupLon = -13.5784;
+          } else {
+            _destinationLat = 9.6412;
+            _destinationLon = -13.5784;
+          }
+        });
+      } else {
+        Get.snackbar('Adresse approximative', 'Coordonnées exactes non trouvées, veuillez préciser');
+      }
     } finally {
       setState(() {
         if (isPickup) {
@@ -214,18 +319,6 @@ class _CreateRidePageState extends State<CreateRidePage> {
           _destinationSuggestions = [];
         }
       });
-    }
-  }
-
-  void _selectSuggestion(String suggestion, bool isPickup) {
-    if (isPickup) {
-      _pickupController.text = suggestion;
-      _pickupSuggestions = [];
-      _searchLocation(suggestion, true);
-    } else {
-      _destinationController.text = suggestion;
-      _destinationSuggestions = [];
-      _searchLocation(suggestion, false);
     }
   }
 
@@ -413,11 +506,15 @@ class _CreateRidePageState extends State<CreateRidePage> {
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: _pickupSuggestions.length,
                           itemBuilder: (context, index) {
+                            final suggestion = _pickupSuggestions[index];
                             return ListTile(
                               dense: true,
-                              title: Text(_pickupSuggestions[index]),
+                              title: Text(suggestion['name'] ?? ''),
+                              subtitle: Text(suggestion['address'] ?? '', 
+                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              ),
                               leading: const Icon(Icons.location_on, size: 18),
-                              onTap: () => _selectSuggestion(_pickupSuggestions[index], true),
+                              onTap: () => _selectSuggestion(suggestion, true),
                             );
                           },
                         ),
@@ -496,11 +593,15 @@ class _CreateRidePageState extends State<CreateRidePage> {
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: _destinationSuggestions.length,
                           itemBuilder: (context, index) {
+                            final suggestion = _destinationSuggestions[index];
                             return ListTile(
                               dense: true,
-                              title: Text(_destinationSuggestions[index]),
+                              title: Text(suggestion['name'] ?? ''),
+                              subtitle: Text(suggestion['address'] ?? '',
+                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              ),
                               leading: const Icon(Icons.location_on, size: 18),
-                              onTap: () => _selectSuggestion(_destinationSuggestions[index], false),
+                              onTap: () => _selectSuggestion(suggestion, false),
                             );
                           },
                         ),

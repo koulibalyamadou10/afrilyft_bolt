@@ -117,18 +117,23 @@ class SupabaseService {
       
       final rideId = rideResponse['id'] as String;
       
-      // Appeler la fonction Edge pour trouver des chauffeurs à proximité
-      final response = await _client.functions.invoke('ride-matching', {
-        body: {
-          rideId: rideId,
-          pickupLat: pickupLat,
-          pickupLng: pickupLon,
-          maxDistance: 5.0,
-        },
-      });
+      // Trouver des chauffeurs à proximité
+      final nearbyDrivers = await findNearbyDrivers(
+        pickupLat: pickupLat,
+        pickupLon: pickupLon,
+        radiusKm: 5.0,
+        maxDrivers: 10,
+      );
       
-      if (response.error) {
-        throw Exception('Erreur lors de la recherche de chauffeurs: ${response.error?.message}');
+      // Créer des demandes de trajet pour les chauffeurs à proximité
+      if (nearbyDrivers.isNotEmpty) {
+        final rideRequests = nearbyDrivers.map((driver) => ({
+          'ride_id': rideId,
+          'driver_id': driver['driver_id'],
+          'status': 'sent',
+        })).toList();
+        
+        await _client.from('ride_requests').insert(rideRequests);
       }
       
       return rideId;
@@ -363,14 +368,12 @@ class SupabaseService {
     Map<String, dynamic>? data,
   }) async {
     try {
-      await _client.functions.invoke('notifications', {
-        body: {
-          userId: userId,
-          title: title,
-          message: message,
-          type: type,
-          data: data,
-        },
+      await _client.from('notifications').insert({
+        'user_id': userId,
+        'title': title,
+        'message': message,
+        'type': type,
+        'data': data,
       });
     } catch (e) {
       print('Erreur lors de l\'envoi de notification: $e');

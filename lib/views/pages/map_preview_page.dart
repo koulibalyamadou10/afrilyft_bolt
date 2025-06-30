@@ -447,12 +447,7 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
             left: 0,
             right: 0,
             child: Container(
-              padding: const EdgeInsets.only(
-                top: 50,
-                left: 16,
-                right: 16,
-                bottom: 16,
-              ),
+              padding: const EdgeInsets.only(top: 50, left: 16, right: 16, bottom: 16),
               decoration: BoxDecoration(
                 color: AppColors.secondary.withOpacity(0.9),
               ),
@@ -489,8 +484,8 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
               decoration: const BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
                 ),
               ),
               child: Column(
