@@ -74,9 +74,11 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> getDriverRideRequests() async {
     final user = _client.auth.currentUser;
     if (user == null) throw Exception('User not authenticated');
-    
+
     try {
-      // Récupérer toutes les demandes disponibles (non assignées)
+      print('🔍 Récupération des demandes pour le chauffeur: ${user.id}');
+
+      // Récupérer les demandes destinées à ce chauffeur spécifique
       final response = await _client
           .from('ride_requests')
           .select('''
@@ -86,19 +88,26 @@ class SupabaseService {
               customer:profiles!rides_customer_id_fkey(full_name, phone)
             )
           ''')
+          .eq('driver_id', user.id)
           .eq('status', 'sent')
           .gt('expires_at', DateTime.now().toIso8601String())
           .order('sent_at', ascending: false);
-      
-      // Filtrer les demandes non assignées côté client
-      final List<Map<String, dynamic>> allRequests = List<Map<String, dynamic>>.from(response);
-      final List<Map<String, dynamic>> availableRequests = allRequests.where((request) => 
-        request['driver_id'] == null
-      ).toList();
-      
-      return availableRequests;
+
+      final List<Map<String, dynamic>> requests =
+          List<Map<String, dynamic>>.from(response);
+
+      print('📋 ${requests.length} demandes trouvées pour ce chauffeur');
+
+      // Afficher les détails des demandes pour le débogage
+      for (var request in requests) {
+        print(
+          '📨 Demande ID: ${request['id']}, Ride ID: ${request['ride_id']}, Status: ${request['status']}',
+        );
+      }
+
+      return requests;
     } catch (e) {
-      print('Erreur lors de la récupération des demandes: $e');
+      print('❌ Erreur lors de la récupération des demandes: $e');
       return [];
     }
   }
@@ -153,16 +162,77 @@ class SupabaseService {
 
   static Future<void> updateDriverAvailability(bool isAvailable) async {
     final user = _client.auth.currentUser;
-    if (user == null) throw Exception('User not authenticated');
+    if (user == null) {
+      print('❌ Utilisateur non authentifié dans updateDriverAvailability');
+      throw Exception('User not authenticated');
+    }
 
     try {
-      await _client.from('driver_locations').upsert({
-        'driver_id': user.id,
-        'is_available': isAvailable,
-        'last_updated': DateTime.now().toIso8601String(),
-      });
+      print('📍 Mise à jour de la disponibilité du chauffeur: $isAvailable');
+      print('📍 ID du chauffeur: ${user.id}');
+
+      // Vérifier d'abord si l'utilisateur existe dans la table profiles
+      final profileCheck =
+          await _client
+              .from('profiles')
+              .select('id, role')
+              .eq('id', user.id)
+              .single();
+
+      print('✅ Profil chauffeur trouvé: ${profileCheck['role']}');
+
+      // Vérifier si une entrée existe déjà pour ce chauffeur
+      final existingLocation =
+          await _client
+              .from('driver_locations')
+              .select('id')
+              .eq('driver_id', user.id)
+              .maybeSingle();
+
+      if (existingLocation != null) {
+        // Mettre à jour l'entrée existante
+        print('📍 Mise à jour de l\'entrée existante');
+        final result = await _client
+            .from('driver_locations')
+            .update({
+              'is_available': isAvailable,
+              'last_updated': DateTime.now().toIso8601String(),
+            })
+            .eq('driver_id', user.id);
+
+        print('✅ Disponibilité mise à jour avec succès (UPDATE)');
+        print('📍 Résultat: $result');
+      } else {
+        // Créer une nouvelle entrée
+        print('📍 Création d\'une nouvelle entrée');
+        final result = await _client.from('driver_locations').insert({
+          'driver_id': user.id,
+          'latitude': 0.0, // Valeur par défaut
+          'longitude': 0.0, // Valeur par défaut
+          'is_available': isAvailable,
+          'last_updated': DateTime.now().toIso8601String(),
+        });
+
+        print('✅ Disponibilité mise à jour avec succès (INSERT)');
+        print('📍 Résultat: $result');
+      }
     } catch (e) {
-      print('Erreur lors de la mise à jour de disponibilité: $e');
+      print('❌ Erreur lors de la mise à jour de disponibilité: $e');
+
+      // Vérifier si la table existe
+      try {
+        final tableCheck = await _client
+            .from('driver_locations')
+            .select('*')
+            .limit(1);
+        print('✅ Table driver_locations accessible');
+      } catch (tableError) {
+        print('❌ Table driver_locations inaccessible: $tableError');
+        throw Exception(
+          'Table driver_locations n\'existe pas ou n\'est pas accessible',
+        );
+      }
+
       rethrow;
     }
   }

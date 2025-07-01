@@ -24,13 +24,13 @@ void main() async {
 
   // Initialiser les services
   await LocationService.initialize();
-  RealtimeService.initialize();
 
   // Initialiser les contrôleurs
   Get.put(AuthController());
 
   runApp(const DriverApp());
 }
+
 class DriverApp extends StatelessWidget {
   const DriverApp({super.key});
 
@@ -43,9 +43,7 @@ class DriverApp extends StatelessWidget {
       home: const SplashScreen(),
       onInit: () {
         // Initialisation des services en arrière-plan
-        Future.delayed(const Duration(seconds: 1), () {
-          RealtimeService.initialize();
-        });
+        print('🚀 Application chauffeur initialisée');
       },
     );
   }

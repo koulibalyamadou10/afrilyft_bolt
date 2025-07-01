@@ -4,6 +4,7 @@ import '../services/supabase_service.dart';
 import '../models/ride_model.dart';
 import '../views/pages/driver_home_page.dart';
 import '../views/pages/login_page.dart';
+import 'driver_controller.dart';
 
 class AuthController extends GetxController {
   final Rx<User?> user = Rx<User?>(null);
@@ -54,7 +55,7 @@ class AuthController extends GetxController {
       final profile = await SupabaseService.getCurrentUserProfile();
       if (profile != null) {
         userProfile.value = UserProfile.fromJson(profile);
-        
+
         // Vérifier que c'est bien un chauffeur
         if (userProfile.value?.role != UserRole.driver) {
           Get.snackbar(
@@ -66,7 +67,10 @@ class AuthController extends GetxController {
           await signOut();
           return;
         }
-        
+
+        // Initialiser le contrôleur chauffeur
+        Get.put(DriverController());
+
         // Naviguer vers la page d'accueil chauffeur
         Get.offAll(() => const DriverHomePage());
       }
@@ -83,7 +87,7 @@ class AuthController extends GetxController {
   }) async {
     try {
       isLoading.value = true;
-      
+
       final response = await SupabaseService.signUp(
         email: email,
         password: password,
@@ -112,7 +116,7 @@ class AuthController extends GetxController {
       }
     } catch (e) {
       Get.snackbar(
-        'Erreur', 
+        'Erreur',
         'Erreur lors de l\'inscription: ${e.toString()}',
         backgroundColor: Get.theme.colorScheme.error,
         colorText: Get.theme.colorScheme.onError,
@@ -123,13 +127,10 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<bool> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<bool> signIn({required String email, required String password}) async {
     try {
       isLoading.value = true;
-      
+
       final response = await SupabaseService.signIn(
         email: email,
         password: password,
@@ -149,7 +150,7 @@ class AuthController extends GetxController {
       }
     } catch (e) {
       Get.snackbar(
-        'Erreur', 
+        'Erreur',
         'Erreur lors de la connexion: ${e.toString()}',
         backgroundColor: Get.theme.colorScheme.error,
         colorText: Get.theme.colorScheme.onError,
@@ -165,7 +166,7 @@ class AuthController extends GetxController {
       await SupabaseService.signOut();
     } catch (e) {
       Get.snackbar(
-        'Erreur', 
+        'Erreur',
         'Erreur lors de la déconnexion: ${e.toString()}',
         backgroundColor: Get.theme.colorScheme.error,
         colorText: Get.theme.colorScheme.onError,
@@ -176,10 +177,10 @@ class AuthController extends GetxController {
   Future<void> updateProfile(Map<String, dynamic> updates) async {
     try {
       isLoading.value = true;
-      
+
       await SupabaseService.updateProfile(updates);
       await _loadUserProfile();
-      
+
       Get.snackbar(
         'Succès',
         'Profil mis à jour avec succès',
@@ -188,7 +189,7 @@ class AuthController extends GetxController {
       );
     } catch (e) {
       Get.snackbar(
-        'Erreur', 
+        'Erreur',
         'Erreur lors de la mise à jour: ${e.toString()}',
         backgroundColor: Get.theme.colorScheme.error,
         colorText: Get.theme.colorScheme.onError,

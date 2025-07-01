@@ -293,12 +293,16 @@ class RideRequest {
   });
 
   factory RideRequest.fromJson(Map<String, dynamic> json) {
+    // Gérer la structure imbriquée des données
+    final rideData = json['rides'] as Map<String, dynamic>? ?? json;
+    final customerData = rideData['customer'] as Map<String, dynamic>?;
+
     return RideRequest(
       id: json['id'],
       rideId: json['ride_id'],
-      customerName: json['customer_name'],
-      pickupAddress: json['pickup_address'] ?? '',
-      destinationAddress: json['destination_address'] ?? '',
+      customerName: customerData?['full_name'] ?? 'Client inconnu',
+      pickupAddress: rideData['pickup_address'] ?? '',
+      destinationAddress: rideData['destination_address'] ?? '',
       sentAt: DateTime.parse(json['sent_at']),
       expiresAt: DateTime.parse(json['expires_at']),
     );
