@@ -1,14 +1,17 @@
-/*
-  # Auto-cancel timeout function
+-- Script pour corriger la récursion infinie dans les triggers
+-- À exécuter dans la console SQL de Supabase
 
-  1. Changes
-     - Adds function to automatically cancel rides after 2 minutes if no driver accepts
-     - Adds trigger to check for expired rides
-     - Ensures proper cleanup of ride requests
-     - FIXED: Prevents infinite recursion in triggers
-*/
+-- 1. Supprimer TOUS les triggers problématiques
+DROP TRIGGER IF EXISTS auto_cancel_expired_rides_trigger ON ride_requests;
+DROP TRIGGER IF EXISTS auto_cancel_expired_rides_update_trigger ON ride_requests;
+DROP TRIGGER IF EXISTS cleanup_expired_requests_trigger ON ride_requests;
 
--- Fonction pour annuler automatiquement les trajets expirés
+-- 2. Supprimer les fonctions problématiques
+DROP FUNCTION IF EXISTS trigger_auto_cancel_expired_rides();
+DROP FUNCTION IF EXISTS auto_cancel_expired_rides();
+DROP FUNCTION IF EXISTS trigger_cleanup_expired_requests();
+
+-- 3. Recréer la fonction d'annulation automatique (CORRIGÉE)
 CREATE OR REPLACE FUNCTION auto_cancel_expired_rides()
 RETURNS void AS $$
 BEGIN
@@ -28,7 +31,6 @@ BEGIN
     );
   
   -- Marquer comme expirées toutes les demandes non répondues pour les trajets annulés
-  -- UTILISER une transaction séparée pour éviter la récursion
   UPDATE ride_requests 
   SET status = 'expired'
   WHERE status = 'sent'
@@ -42,11 +44,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Fonction trigger pour exécuter l'annulation automatique (CORRIGÉE)
+-- 4. Recréer la fonction trigger (CORRIGÉE)
 CREATE OR REPLACE FUNCTION trigger_auto_cancel_expired_rides()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Éviter la récursion en vérifiant si on est déjà dans un trigger
+  -- Éviter la récursion en vérifiant le type d'opération
   IF TG_OP = 'INSERT' THEN
     -- Pour les insertions, exécuter seulement si c'est une nouvelle demande
     IF NEW.status = 'sent' THEN
@@ -66,21 +68,34 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger pour exécuter l'annulation automatique après chaque insertion de demande (CORRIGÉ)
-DROP TRIGGER IF EXISTS auto_cancel_expired_rides_trigger ON ride_requests;
+-- 5. Recréer la fonction de nettoyage (CORRIGÉE)
+CREATE OR REPLACE FUNCTION trigger_cleanup_expired_requests()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Nettoyer les demandes expirées sans créer de récursion
+  UPDATE ride_requests 
+  SET status = 'expired' 
+  WHERE expires_at < now() AND status = 'sent';
+  
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 6. Recréer les triggers (CORRIGÉS)
 CREATE TRIGGER auto_cancel_expired_rides_trigger
   AFTER INSERT ON ride_requests
   FOR EACH ROW
   EXECUTE FUNCTION trigger_auto_cancel_expired_rides();
 
--- Trigger pour exécuter l'annulation automatique après chaque mise à jour de demande (CORRIGÉ)
-DROP TRIGGER IF EXISTS auto_cancel_expired_rides_update_trigger ON ride_requests;
 CREATE TRIGGER auto_cancel_expired_rides_update_trigger
   AFTER UPDATE ON ride_requests
   FOR EACH ROW
   EXECUTE FUNCTION trigger_auto_cancel_expired_rides();
 
--- Fonction pour vérifier et annuler un trajet spécifique (CORRIGÉE)
+-- Note: Le trigger cleanup_expired_requests_trigger est maintenant géré par auto_cancel_expired_rides
+-- donc on ne le recrée pas pour éviter les conflits
+
+-- 7. Recréer la fonction de vérification spécifique (CORRIGÉE)
 CREATE OR REPLACE FUNCTION check_and_cancel_ride_if_expired(p_ride_id uuid)
 RETURNS boolean AS $$
 DECLARE
@@ -114,7 +129,7 @@ BEGIN
       cancelled_at = now()
     WHERE id = p_ride_id;
     
-    -- Marquer toutes les demandes comme expirées (sans déclencher de trigger)
+    -- Marquer toutes les demandes comme expirées
     UPDATE ride_requests 
     SET status = 'expired'
     WHERE ride_id = p_ride_id AND status = 'sent';
@@ -125,4 +140,16 @@ BEGIN
   
   RETURN false;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER; 
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 8. Vérifier que les corrections sont appliquées
+SELECT 'Triggers et fonctions corrigés avec succès!' as status;
+
+-- 9. Afficher les triggers actifs sur ride_requests
+SELECT 
+  trigger_name,
+  event_manipulation,
+  action_timing,
+  action_statement
+FROM information_schema.triggers 
+WHERE event_object_table = 'ride_requests'; 

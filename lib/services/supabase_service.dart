@@ -229,7 +229,7 @@ class SupabaseService {
     try {
       print('📝 Création du trajet dans la base de données...');
 
-      // Préparer les données pour l'insertion
+      // Préparer les données pour l'insertion (SANS jointures)
       final rideData = {
         'customer_id': user.id,
         'pickup_latitude': pickupLat,
@@ -246,14 +246,14 @@ class SupabaseService {
 
       print('📊 Données à insérer: $rideData');
 
-      // Créer d'abord le trajet
+      // Créer d'abord le trajet (SANS jointures)
       final rideResponse =
           await _client.from('rides').insert(rideData).select('id').single();
 
       final rideId = rideResponse['id'] as String;
       print('✅ Trajet créé avec ID: $rideId');
 
-      // Trouver des chauffeurs à proximité
+      // Trouver des chauffeurs à proximité (séparément)
       print('🔍 Recherche de chauffeurs à proximité...');
       final nearbyDrivers = await findNearbyDrivers(
         pickupLat: pickupLat,
@@ -297,22 +297,10 @@ class SupabaseService {
     if (user == null) throw Exception('User not authenticated');
 
     try {
+      // Récupérer les trajets sans jointures
       final response = await _client
           .from('rides')
-          .select('''
-            *,
-            driver:profiles!rides_driver_id_fkey(
-              id,
-              email,
-              full_name,
-              phone,
-              role,
-              avatar_url,
-              is_active,
-              is_verified,
-              created_at
-            )
-          ''')
+          .select('*')
           .eq('customer_id', user.id)
           .order('created_at', ascending: false);
 
@@ -327,39 +315,17 @@ class SupabaseService {
     try {
       print('🔍 Récupération du trajet avec ID: $rideId');
 
-      final response =
-          await _client
-              .from('rides')
-              .select('''
-            *,
-            customer:profiles!rides_customer_id_fkey(
-              id,
-              email,
-              full_name,
-              phone,
-              role,
-              avatar_url,
-              is_active,
-              is_verified,
-              created_at
-            ),
-            driver:profiles!rides_driver_id_fkey(
-              id,
-              email,
-              full_name,
-              phone,
-              role,
-              avatar_url,
-              is_active,
-              is_verified,
-              created_at
-            )
-          ''')
-              .eq('id', rideId)
-              .single();
+      // Récupérer d'abord le trajet sans jointures
+      final rideResponse =
+          await _client.from('rides').select('*').eq('id', rideId).single();
 
-      print('✅ Trajet récupéré: $response');
-      return response;
+      if (rideResponse == null) {
+        print('❌ Trajet non trouvé');
+        return null;
+      }
+
+      print('✅ Trajet récupéré: $rideResponse');
+      return rideResponse;
     } catch (e) {
       print('❌ Erreur lors de la récupération du trajet: $e');
       return null;

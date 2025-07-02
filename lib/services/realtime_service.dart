@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import '../models/ride_model.dart';
 import '../controllers/ride_controller.dart';
 import '../controllers/auth_controller.dart';
-import 'package:flutter/material.dart';
 
 class RealtimeService {
   static final SupabaseClient _client = Supabase.instance.client;
