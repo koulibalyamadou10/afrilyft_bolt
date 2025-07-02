@@ -58,6 +58,14 @@ class _RideTrackingPageState extends State<RideTrackingPage>
             Get.offAllNamed('/home');
           }
         });
+      } else {
+        // Réafficher le trajet et les marqueurs
+        setState(() {
+          _markers.clear();
+          _polylines.clear();
+          _initializeMap();
+          _updateMapWithCurrentLocation();
+        });
       }
     });
 
@@ -97,10 +105,15 @@ class _RideTrackingPageState extends State<RideTrackingPage>
       setState(() {
         _currentPosition = position;
         _isLoadingLocation = false;
+        // Mettre à jour la carte avec la nouvelle position
+        _markers.removeWhere(
+          (marker) => marker.markerId.value == 'current_location',
+        );
+        _updateMapWithCurrentLocation();
       });
 
       // Centrer immédiatement la carte sur la position actuelle
-      _updateMapWithCurrentLocation();
+      //_updateMapWithCurrentLocation(); // déjà appelé dans setState ci-dessus
     } catch (e) {
       print('❌ Erreur lors de l\'obtention de la position: $e');
       setState(() {
@@ -123,7 +136,11 @@ class _RideTrackingPageState extends State<RideTrackingPage>
     final ride = rideController.currentRide.value;
     if (ride == null) return;
 
-    // Marqueur de départ
+    // Réinitialiser les marqueurs et polylignes
+    _markers.clear();
+    _polylines.clear();
+
+    // Marqueur de départ (vert)
     _markers.add(
       Marker(
         markerId: const MarkerId('pickup'),
@@ -136,7 +153,7 @@ class _RideTrackingPageState extends State<RideTrackingPage>
       ),
     );
 
-    // Marqueur de destination
+    // Marqueur de destination (rouge)
     _markers.add(
       Marker(
         markerId: const MarkerId('destination'),
@@ -148,6 +165,24 @@ class _RideTrackingPageState extends State<RideTrackingPage>
         ),
       ),
     );
+
+    // Marqueur de position actuelle du client (bleu)
+    if (_currentPosition != null) {
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('current_location'),
+          position: LatLng(
+            _currentPosition!.latitude,
+            _currentPosition!.longitude,
+          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+          infoWindow: const InfoWindow(
+            title: 'Votre position',
+            snippet: 'Position actuelle',
+          ),
+        ),
+      );
+    }
 
     // Ligne de trajet
     _polylines.add(
@@ -628,7 +663,16 @@ class _RideTrackingPageState extends State<RideTrackingPage>
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  Get.to(() => const DriverSearchPage());
+                  if (rideController.nearbyDrivers.isNotEmpty) {
+                    Get.to(() => const DriverSearchPage());
+                  } else {
+                    Get.snackbar(
+                      'Aucun chauffeur',
+                      'Aucun chauffeur n\'est disponible pour le moment.',
+                      backgroundColor: Colors.orange,
+                      colorText: Colors.white,
+                    );
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: iconColor,
