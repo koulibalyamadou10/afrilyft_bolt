@@ -28,11 +28,13 @@ class _DriverSearchPageState extends State<DriverSearchPage>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // Vérifier que le timer est actif pour ce trajet
+    // Démarrer le timer de recherche quand on arrive sur cette page
     final currentRide = rideController.currentRide.value;
     if (currentRide != null && rideController.isSearchingDriver.value) {
-      print('⏰ Timer actif pour le trajet: ${currentRide.id}');
-      print('⏰ Temps restant: ${rideController.timeRemaining.value} secondes');
+      print(
+        '⏰ Démarrage du timer de recherche pour le trajet: ${currentRide.id}',
+      );
+      rideController.startSearchTimer();
     }
 
     // Écouter les changements du trajet actuel

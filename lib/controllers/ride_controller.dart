@@ -323,10 +323,7 @@ class RideController extends GetxController {
 
       print('🚗 ${nearbyDrivers.length} chauffeurs trouvés à proximité');
 
-      // 4. Démarrer le timer de timeout
-      _startTimeoutTimer(rideId);
-
-      // 5. Afficher le message de confirmation
+      // 4. Afficher le message de confirmation
       Get.snackbar(
         'Recherche lancée',
         '${nearbyDrivers.length} chauffeurs ont été notifiés. En attente d\'acceptation...',
@@ -464,6 +461,17 @@ class RideController extends GetxController {
         await _handleTimeout(rideId);
       }
     });
+  }
+
+  // NOUVELLE: Méthode publique pour démarrer le timer depuis la page de recherche
+  void startSearchTimer() {
+    final currentRide = this.currentRide.value;
+    if (currentRide != null && isSearchingDriver.value) {
+      print(
+        '⏰ Démarrage du timer de recherche pour le trajet: ${currentRide.id}',
+      );
+      _startTimeoutTimer(currentRide.id);
+    }
   }
 
   // NOUVELLE: Gérer le timeout d'un trajet
