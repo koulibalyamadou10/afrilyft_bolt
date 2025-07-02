@@ -258,7 +258,7 @@ class SupabaseService {
       final nearbyDrivers = await findNearbyDrivers(
         pickupLat: pickupLat,
         pickupLon: pickupLon,
-        radiusKm: 5.0,
+        radiusKm: 10,
         maxDrivers: 10,
       );
 
@@ -575,6 +575,64 @@ class SupabaseService {
     } catch (e) {
       print('Erreur lors de l\'envoi de notification: $e');
       rethrow;
+    }
+  }
+
+  // NOUVELLE: Fonction pour supprimer complètement un trajet après timeout
+  static Future<bool> deleteExpiredRide(String rideId) async {
+    try {
+      print('🗑️ Suppression du trajet expiré: $rideId');
+
+      // Supprimer d'abord les demandes de trajet associées
+      await _client.from('ride_requests').delete().eq('ride_id', rideId);
+
+      print('✅ Demandes de trajet supprimées');
+
+      // Supprimer ensuite le trajet lui-même
+      await _client.from('rides').delete().eq('id', rideId);
+
+      print('✅ Trajet supprimé de la base de données');
+      return true;
+    } catch (e) {
+      print('❌ Erreur lors de la suppression du trajet: $e');
+      return false;
+    }
+  }
+
+  // NOUVELLE: Fonction pour vérifier et supprimer un trajet expiré
+  static Future<bool> checkAndDeleteExpiredRide(String rideId) async {
+    try {
+      print('🔍 Vérification de l\'expiration du trajet: $rideId');
+
+      // Vérifier si le trajet existe et est en statut 'searching'
+      final rideResponse =
+          await _client
+              .from('rides')
+              .select('created_at, status')
+              .eq('id', rideId)
+              .eq('status', 'searching')
+              .single();
+
+      if (rideResponse == null) {
+        print('⚠️ Trajet non trouvé ou déjà traité');
+        return false;
+      }
+
+      final createdAt = DateTime.parse(rideResponse['created_at']);
+      final now = DateTime.now();
+      final elapsed = now.difference(createdAt);
+
+      // Vérifier si plus de 2 minutes se sont écoulées
+      if (elapsed.inMinutes >= 2) {
+        print('⏰ Trajet expiré, suppression en cours...');
+        return await deleteExpiredRide(rideId);
+      } else {
+        print('✅ Trajet encore valide');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la vérification d\'expiration: $e');
+      return false;
     }
   }
 }

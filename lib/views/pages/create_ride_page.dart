@@ -5,7 +5,7 @@ import 'package:geocoding/geocoding.dart';
 import '../../controllers/ride_controller.dart';
 import '../../services/places_service.dart';
 import '../../theme/app_colors.dart';
-import 'map_preview_page.dart';
+import 'ride_tracking_page.dart';
 import 'dart:async';
 
 class CreateRidePage extends StatefulWidget {
@@ -29,6 +29,7 @@ class _CreateRidePageState extends State<CreateRidePage> {
 
   bool _isLoadingPickup = false;
   bool _isLoadingDestination = false;
+  bool _isCreatingRide = false;
 
   List<Map<String, dynamic>> _pickupSuggestions = [];
   List<Map<String, dynamic>> _destinationSuggestions = [];
@@ -54,21 +55,25 @@ class _CreateRidePageState extends State<CreateRidePage> {
     // Add listeners to focus nodes
     _pickupFocusNode.addListener(() {
       if (!_pickupFocusNode.hasFocus) {
-        // Annuler le timer en cours et masquer les suggestions
+        // Annuler le timer en cours et masquer immédiatement les suggestions
         _pickupDebounceTimer?.cancel();
-        setState(() {
-          _pickupSuggestions = [];
-        });
+        if (mounted) {
+          setState(() {
+            _pickupSuggestions = [];
+          });
+        }
       }
     });
 
     _destinationFocusNode.addListener(() {
       if (!_destinationFocusNode.hasFocus) {
-        // Annuler le timer en cours et masquer les suggestions
+        // Annuler le timer en cours et masquer immédiatement les suggestions
         _destinationDebounceTimer?.cancel();
-        setState(() {
-          _destinationSuggestions = [];
-        });
+        if (mounted) {
+          setState(() {
+            _destinationSuggestions = [];
+          });
+        }
       }
     });
   }
@@ -96,7 +101,10 @@ class _CreateRidePageState extends State<CreateRidePage> {
     if (query.length >= 2) {
       // Attendre 500ms avant de faire la requête pour éviter trop d'appels API
       _pickupDebounceTimer = Timer(const Duration(milliseconds: 500), () {
-        _getAddressSuggestions(query, true);
+        // Vérifier que le focus est toujours actif avant d'afficher les suggestions
+        if (_pickupFocusNode.hasFocus) {
+          _getAddressSuggestions(query, true);
+        }
       });
     } else {
       setState(() {
@@ -114,7 +122,10 @@ class _CreateRidePageState extends State<CreateRidePage> {
     if (query.length >= 2) {
       // Attendre 500ms avant de faire la requête pour éviter trop d'appels API
       _destinationDebounceTimer = Timer(const Duration(milliseconds: 500), () {
-        _getAddressSuggestions(query, false);
+        // Vérifier que le focus est toujours actif avant d'afficher les suggestions
+        if (_destinationFocusNode.hasFocus) {
+          _getAddressSuggestions(query, false);
+        }
       });
     } else {
       setState(() {
@@ -129,22 +140,41 @@ class _CreateRidePageState extends State<CreateRidePage> {
     try {
       final suggestions = await PlacesService.getPlaceSuggestions(query);
 
-      setState(() {
-        if (isPickup) {
-          _pickupSuggestions = suggestions;
-        } else {
-          _destinationSuggestions = suggestions;
+      // Vérifier que le widget est toujours monté et que le focus est actif
+      if (mounted) {
+        final hasFocus =
+            isPickup
+                ? _pickupFocusNode.hasFocus
+                : _destinationFocusNode.hasFocus;
+
+        if (hasFocus) {
+          setState(() {
+            if (isPickup) {
+              _pickupSuggestions = suggestions;
+            } else {
+              _destinationSuggestions = suggestions;
+            }
+          });
         }
-      });
+      }
     } catch (e) {
       print('Erreur lors de la recherche de suggestions: $e');
-      setState(() {
-        if (isPickup) {
-          _pickupSuggestions = [];
-        } else {
-          _destinationSuggestions = [];
+      if (mounted) {
+        final hasFocus =
+            isPickup
+                ? _pickupFocusNode.hasFocus
+                : _destinationFocusNode.hasFocus;
+
+        if (hasFocus) {
+          setState(() {
+            if (isPickup) {
+              _pickupSuggestions = [];
+            } else {
+              _destinationSuggestions = [];
+            }
+          });
         }
-      });
+      }
     }
   }
 
@@ -327,7 +357,10 @@ class _CreateRidePageState extends State<CreateRidePage> {
     }
   }
 
-  void _proceedToMapPreview() {
+  // NOUVEAU: Créer le trajet et rechercher les chauffeurs
+  Future<void> _createRideAndSearchDrivers() async {
+    if (_isCreatingRide) return;
+
     if (_pickupController.text.isEmpty || _destinationController.text.isEmpty) {
       Get.snackbar(
         'Erreur',
@@ -336,34 +369,47 @@ class _CreateRidePageState extends State<CreateRidePage> {
       return;
     }
 
-    if (_pickupLat == null ||
-        _pickupLon == null ||
-        _destinationLat == null ||
-        _destinationLon == null) {
-      // Try to search for locations if coordinates are not set
-      _searchLocation(_pickupController.text, true).then((_) {
-        _searchLocation(_destinationController.text, false).then((_) {
-          if (_pickupLat != null &&
-              _pickupLon != null &&
-              _destinationLat != null &&
-              _destinationLon != null) {
-            _navigateToMapPreview();
-          } else {
-            Get.snackbar(
-              'Erreur',
-              'Impossible de trouver les coordonnées des adresses',
-            );
-          }
-        });
-      });
-    } else {
-      _navigateToMapPreview();
+    // Vérifier si les adresses sont différentes
+    if (_pickupController.text.trim() == _destinationController.text.trim()) {
+      Get.snackbar(
+        'Erreur',
+        'Les adresses de départ et de destination ne peuvent pas être identiques',
+      );
+      return;
     }
-  }
 
-  void _navigateToMapPreview() {
-    Get.to(
-      () => MapPreviewPage(
+    setState(() {
+      _isCreatingRide = true;
+    });
+
+    try {
+      // Si les coordonnées ne sont pas définies, les obtenir depuis les adresses
+      if (_pickupLat == null || _pickupLon == null) {
+        await _searchLocation(_pickupController.text, true);
+      }
+      if (_destinationLat == null || _destinationLon == null) {
+        await _searchLocation(_destinationController.text, false);
+      }
+
+      // Vérifier que toutes les coordonnées sont maintenant définies
+      if (_pickupLat == null ||
+          _pickupLon == null ||
+          _destinationLat == null ||
+          _destinationLon == null) {
+        throw Exception('Impossible de trouver les coordonnées des adresses');
+      }
+
+      print('🚀 Début de création du trajet...');
+      print(
+        '📍 Départ: ${_pickupController.text} (${_pickupLat}, ${_pickupLon})',
+      );
+      print(
+        '🎯 Destination: ${_destinationController.text} (${_destinationLat}, ${_destinationLon})',
+      );
+      print('💳 Paiement: $_selectedPaymentMethod');
+
+      // 1. Créer le trajet et rechercher les chauffeurs
+      await rideController.createRideWithDriverSearch(
         pickupLat: _pickupLat!,
         pickupLon: _pickupLon!,
         pickupAddress: _pickupController.text,
@@ -373,8 +419,30 @@ class _CreateRidePageState extends State<CreateRidePage> {
         paymentMethod: _selectedPaymentMethod,
         notes: _notesController.text.isNotEmpty ? _notesController.text : null,
         scheduledFor: _scheduledFor,
-      ),
-    );
+      );
+
+      print('✅ Trajet créé avec succès!');
+
+      // 2. Naviguer directement vers la page de suivi
+      if (rideController.currentRide.value != null) {
+        Get.off(() => const RideTrackingPage());
+      } else {
+        throw Exception('Le trajet a été créé mais n\'a pas pu être récupéré');
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la création du trajet: $e');
+      Get.snackbar(
+        'Erreur',
+        'Impossible de créer le trajet: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
+    } finally {
+      setState(() {
+        _isCreatingRide = false;
+      });
+    }
   }
 
   @override
@@ -419,26 +487,52 @@ class _CreateRidePageState extends State<CreateRidePage> {
 
             const SizedBox(height: 32),
 
-            // Bouton pour voir la carte
+            // Bouton pour créer le trajet
             SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: _proceedToMapPreview,
+                onPressed: _isCreatingRide ? null : _createRideAndSearchDrivers,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Voir sur la carte',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
+                child:
+                    _isCreatingRide
+                        ? const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                                strokeWidth: 2,
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Text(
+                              'Création en cours...',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        )
+                        : const Text(
+                          'Créer le trajet',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
               ),
             ),
           ],

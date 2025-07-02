@@ -252,6 +252,98 @@ class RideController extends GetxController {
     }
   }
 
+  // NOUVELLE: Créer un trajet avec recherche de chauffeurs en une seule étape
+  Future<void> createRideWithDriverSearch({
+    required double pickupLat,
+    required double pickupLon,
+    required String pickupAddress,
+    required double destinationLat,
+    required double destinationLon,
+    required String destinationAddress,
+    String paymentMethod = 'cash',
+    String? notes,
+    DateTime? scheduledFor,
+  }) async {
+    try {
+      isLoading.value = true;
+      isSearchingDriver.value = true;
+
+      print('🚀 Création du trajet avec recherche de chauffeurs...');
+
+      // 1. Créer le trajet dans la base de données
+      final rideId = await SupabaseService.createRide(
+        pickupLat: pickupLat,
+        pickupLon: pickupLon,
+        pickupAddress: pickupAddress,
+        destinationLat: destinationLat,
+        destinationLon: destinationLon,
+        destinationAddress: destinationAddress,
+        paymentMethod: paymentMethod,
+        notes: notes,
+        scheduledFor: scheduledFor,
+      );
+
+      // 2. Récupérer les détails du trajet créé
+      final rideData = await SupabaseService.getRideById(rideId);
+      if (rideData != null) {
+        currentRide.value = RideModel.fromJson(rideData);
+        // Ajouter à l'historique
+        rideHistory.insert(0, currentRide.value!);
+        print('✅ Trajet ajouté au contrôleur avec succès');
+      } else {
+        print('⚠️ Trajet créé mais impossible de le récupérer');
+        throw Exception('Le trajet a été créé mais n\'a pas pu être récupéré');
+      }
+
+      // 3. Rechercher les chauffeurs à proximité
+      print('🔍 Recherche de chauffeurs à proximité...');
+      final drivers = await SupabaseService.findNearbyDrivers(
+        pickupLat: pickupLat,
+        pickupLon: pickupLon,
+        radiusKm: 10.0,
+        maxDrivers: 10,
+      );
+
+      nearbyDrivers.value =
+          drivers
+              .map(
+                (driver) => DriverLocation(
+                  id: driver['driver_id'],
+                  driverId: driver['driver_id'],
+                  lat: driver['location_lat'],
+                  lon: driver['location_lon'],
+                  heading: driver['heading']?.toDouble(),
+                  speed: driver['speed']?.toDouble(),
+                  isAvailable: true,
+                  lastUpdated: DateTime.parse(driver['last_updated']),
+                ),
+              )
+              .toList();
+
+      print('🚗 ${nearbyDrivers.length} chauffeurs trouvés à proximité');
+
+      // 4. Démarrer le timer de timeout
+      _startTimeoutTimer(rideId);
+
+      // 5. Afficher le message de confirmation
+      Get.snackbar(
+        'Recherche lancée',
+        '${nearbyDrivers.length} chauffeurs ont été notifiés. En attente d\'acceptation...',
+        duration: const Duration(seconds: 3),
+      );
+
+      print('🚀 Trajet créé avec ID: $rideId');
+      print('📱 ${nearbyDrivers.length} chauffeurs notifiés');
+    } catch (e) {
+      print('❌ Erreur dans le contrôleur lors de la création du trajet: $e');
+      Get.snackbar('Erreur', 'Impossible de créer le trajet: $e');
+      isSearchingDriver.value = false;
+      throw e; // Propager l'erreur pour que la page puisse la gérer
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   // Calculer la distance entre deux points
   double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371; // Rayon de la Terre en km
@@ -378,13 +470,13 @@ class RideController extends GetxController {
     try {
       print('⏰ Timeout atteint pour le trajet: $rideId');
 
-      // Vérifier et annuler le trajet dans la base de données
-      final wasCancelled = await SupabaseService.checkAndCancelExpiredRide(
+      // Vérifier et supprimer le trajet expiré de la base de données
+      final wasDeleted = await SupabaseService.checkAndDeleteExpiredRide(
         rideId,
       );
 
-      if (wasCancelled) {
-        print('✅ Trajet annulé automatiquement: $rideId');
+      if (wasDeleted) {
+        print('✅ Trajet supprimé automatiquement: $rideId');
 
         // Mettre à jour le statut local
         if (currentRide.value?.id == rideId) {
@@ -404,9 +496,41 @@ class RideController extends GetxController {
           backgroundColor: Colors.orange,
           colorText: Colors.white,
         );
+
+        // NOUVEAU: Retourner à la page précédente après 3 secondes
+        Future.delayed(const Duration(seconds: 3), () {
+          // Nettoyer l'état du contrôleur
+          clearCurrentRide();
+
+          // Retourner à la page précédente
+          try {
+            Get.back();
+          } catch (e) {
+            // Si on ne peut pas revenir en arrière, aller à la page d'accueil
+            Get.offAllNamed('/home');
+          }
+        });
       }
     } catch (e) {
       print('❌ Erreur lors de la gestion du timeout: $e');
+
+      // En cas d'erreur, nettoyer quand même et retourner
+      clearCurrentRide();
+      Get.snackbar(
+        'Erreur',
+        'Une erreur est survenue lors de l\'annulation du trajet',
+        duration: const Duration(seconds: 3),
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+
+      Future.delayed(const Duration(seconds: 2), () {
+        try {
+          Get.back();
+        } catch (e) {
+          Get.offAllNamed('/home');
+        }
+      });
     }
   }
 

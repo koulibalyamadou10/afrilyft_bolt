@@ -44,6 +44,31 @@ class _RideTrackingPageState extends State<RideTrackingPage>
     ever(rideController.nearbyDrivers, (_) {
       _addDriverMarkers();
     });
+
+    // NOUVEAU: Écouter les changements du trajet actuel
+    ever(rideController.currentRide, (ride) {
+      if (ride == null) {
+        // Le trajet a été supprimé, retourner à la page précédente
+        print('🔄 Trajet supprimé, retour à la page précédente');
+        Future.delayed(const Duration(seconds: 1), () {
+          try {
+            Get.back();
+          } catch (e) {
+            Get.offAllNamed('/home');
+          }
+        });
+      }
+    });
+
+    // NOUVEAU: Écouter les changements du statut de recherche
+    ever(rideController.isSearchingDriver, (isSearching) {
+      if (!isSearching &&
+          rideController.currentRide.value?.status == RideStatus.searching) {
+        // La recherche s'est arrêtée mais le trajet est toujours en statut 'searching'
+        // Cela peut indiquer une expiration
+        print('🔄 Recherche arrêtée, vérification du statut du trajet');
+      }
+    });
   }
 
   @override
