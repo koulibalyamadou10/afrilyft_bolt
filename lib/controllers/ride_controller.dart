@@ -1,3 +1,4 @@
+import 'package:afrilyft/views/pages/create_ride_page.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/ride_model.dart';
@@ -504,9 +505,8 @@ class RideController extends GetxController {
 
           // Retourner à la page précédente
           try {
-            Get.back();
+            Get.offAll(() => const CreateRidePage());
           } catch (e) {
-            // Si on ne peut pas revenir en arrière, aller à la page d'accueil
             Get.offAllNamed('/home');
           }
         });

@@ -6,6 +6,7 @@ import '../../controllers/ride_controller.dart';
 import '../../models/ride_model.dart';
 import '../../theme/app_colors.dart';
 import '../../config/maps_config.dart';
+import 'driver_search_page.dart';
 
 class RideTrackingPage extends StatefulWidget {
   const RideTrackingPage({Key? key}) : super(key: key);
@@ -16,7 +17,7 @@ class RideTrackingPage extends StatefulWidget {
 
 class _RideTrackingPageState extends State<RideTrackingPage>
     with TickerProviderStateMixin {
-  final RideController rideController = Get.find<RideController>();
+  final RideController rideController = Get.put(RideController());
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -571,58 +572,82 @@ class _RideTrackingPageState extends State<RideTrackingPage>
   }
 
   Widget _buildSearchingInfo() {
-    return Obx(
-      () => Container(
+    return Obx(() {
+      final driverCount = rideController.nearbyDrivers.length;
+
+      // Déterminer la couleur et l'icône selon le nombre de chauffeurs
+      Color containerColor;
+      Color iconColor;
+      IconData icon;
+      String message;
+
+      if (driverCount == 0) {
+        containerColor = Colors.orange.withOpacity(0.1);
+        iconColor = Colors.orange;
+        icon = Icons.directions_car_outlined;
+        message = 'Aucun chauffeur disponible';
+      } else if (driverCount == 1) {
+        containerColor = Colors.green.withOpacity(0.1);
+        iconColor = Colors.green;
+        icon = Icons.directions_car;
+        message = '1 chauffeur disponible';
+      } else {
+        containerColor = Colors.green.withOpacity(0.1);
+        iconColor = Colors.green;
+        icon = Icons.directions_car;
+        message = '$driverCount chauffeurs disponibles';
+      }
+
+      return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.1),
+          color: containerColor,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: iconColor.withOpacity(0.3), width: 1),
         ),
         child: Column(
           children: [
             Row(
               children: [
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.primary,
+                Icon(icon, color: iconColor, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: iconColor,
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Recherche d\'un chauffeur...',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              '${rideController.nearbyDrivers.length} chauffeurs notifiés',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 8),
-            Obx(() {
-              final remaining = rideController.timeRemaining.value;
-              final minutes = remaining ~/ 60;
-              final seconds = remaining % 60;
-              return Text(
-                'Temps restant: ${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: remaining <= 30 ? Colors.red : Colors.grey[500],
-                  fontWeight:
-                      remaining <= 30 ? FontWeight.bold : FontWeight.normal,
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Get.to(() => const DriverSearchPage());
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: iconColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-              );
-            }),
+                child: const Text(
+                  'Continuer',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
           ],
         ),
-      ),
-    );
+      );
+    });
   }
 
   String _getStatusTitle(RideStatus status) {
