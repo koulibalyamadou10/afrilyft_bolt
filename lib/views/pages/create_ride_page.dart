@@ -41,6 +41,9 @@ class _CreateRidePageState extends State<CreateRidePage> {
   Timer? _pickupDebounceTimer;
   Timer? _destinationDebounceTimer;
 
+  // Ajout : pour annuler la géolocalisation si focus manuel
+  bool _cancelGeoloc = false;
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +57,15 @@ class _CreateRidePageState extends State<CreateRidePage> {
 
     // Add listeners to focus nodes
     _pickupFocusNode.addListener(() {
+      if (_pickupFocusNode.hasFocus) {
+        // Annuler la recherche de position initiale si l'utilisateur veut saisir manuellement
+        _cancelGeoloc = true;
+        if (mounted) {
+          setState(() {
+            _isLoadingPickup = false;
+          });
+        }
+      }
       if (!_pickupFocusNode.hasFocus) {
         // Annuler le timer en cours et masquer immédiatement les suggestions
         _pickupDebounceTimer?.cancel();
@@ -185,10 +197,24 @@ class _CreateRidePageState extends State<CreateRidePage> {
 
     try {
       final position = await Geolocator.getCurrentPosition();
+      if (_cancelGeoloc) {
+        // L'utilisateur a pris le focus, on ignore le résultat
+        setState(() {
+          _isLoadingPickup = false;
+        });
+        return;
+      }
       final placemarks = await placemarkFromCoordinates(
         position.latitude,
         position.longitude,
       );
+
+      if (_cancelGeoloc) {
+        setState(() {
+          _isLoadingPickup = false;
+        });
+        return;
+      }
 
       if (placemarks.isNotEmpty) {
         final placemark = placemarks.first;

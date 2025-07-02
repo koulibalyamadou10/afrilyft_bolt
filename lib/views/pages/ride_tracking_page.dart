@@ -27,6 +27,11 @@ class _RideTrackingPageState extends State<RideTrackingPage>
   Position? _currentPosition;
   bool _isLoadingLocation = true;
 
+  // Ajout : Workers pour annuler les écouteurs GetX
+  late Worker _driverWorker;
+  late Worker _rideWorker;
+  late Worker _searchingWorker;
+
   @override
   void initState() {
     super.initState();
@@ -42,12 +47,12 @@ class _RideTrackingPageState extends State<RideTrackingPage>
     _initializeMap();
 
     // Écouter les changements de chauffeurs
-    ever(rideController.nearbyDrivers, (_) {
+    _driverWorker = ever(rideController.nearbyDrivers, (_) {
       _addDriverMarkers();
     });
 
     // NOUVEAU: Écouter les changements du trajet actuel
-    ever(rideController.currentRide, (ride) {
+    _rideWorker = ever(rideController.currentRide, (ride) {
       if (ride == null) {
         // Le trajet a été supprimé, retourner à la page précédente
         print('🔄 Trajet supprimé, retour à la page précédente');
@@ -59,18 +64,15 @@ class _RideTrackingPageState extends State<RideTrackingPage>
           }
         });
       } else {
-        // Réafficher le trajet et les marqueurs
+        if (!mounted) return;
         setState(() {
-          _markers.clear();
-          _polylines.clear();
           _initializeMap();
-          _updateMapWithCurrentLocation();
         });
       }
     });
 
     // NOUVEAU: Écouter les changements du statut de recherche
-    ever(rideController.isSearchingDriver, (isSearching) {
+    _searchingWorker = ever(rideController.isSearchingDriver, (isSearching) {
       if (!isSearching &&
           rideController.currentRide.value?.status == RideStatus.searching) {
         // La recherche s'est arrêtée mais le trajet est toujours en statut 'searching'
@@ -84,11 +86,16 @@ class _RideTrackingPageState extends State<RideTrackingPage>
   void dispose() {
     _pulseController.dispose();
     _mapController?.dispose();
+    // Annuler les écouteurs GetX
+    _driverWorker.dispose();
+    _rideWorker.dispose();
+    _searchingWorker.dispose();
     super.dispose();
   }
 
   Future<void> _getCurrentLocation() async {
     try {
+      if (!mounted) return;
       setState(() {
         _isLoadingLocation = true;
       });
@@ -102,20 +109,18 @@ class _RideTrackingPageState extends State<RideTrackingPage>
 
       print('✅ Position obtenue: ${position.latitude}, ${position.longitude}');
 
+      if (!mounted) return;
       setState(() {
         _currentPosition = position;
         _isLoadingLocation = false;
-        // Mettre à jour la carte avec la nouvelle position
-        _markers.removeWhere(
-          (marker) => marker.markerId.value == 'current_location',
-        );
-        _updateMapWithCurrentLocation();
+        _initializeMap();
       });
 
       // Centrer immédiatement la carte sur la position actuelle
-      //_updateMapWithCurrentLocation(); // déjà appelé dans setState ci-dessus
+      //_updateMapWithCurrentLocation(); // déjà inclus dans _initializeMap
     } catch (e) {
       print('❌ Erreur lors de l\'obtention de la position: $e');
+      if (!mounted) return;
       setState(() {
         _isLoadingLocation = false;
       });

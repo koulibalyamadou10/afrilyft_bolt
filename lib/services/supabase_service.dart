@@ -255,6 +255,11 @@ class SupabaseService {
 
       // Trouver des chauffeurs à proximité (séparément)
       print('🔍 Recherche de chauffeurs à proximité...');
+
+      // Affihcer le pickuplat et pickuplon
+      print('🚗 pickupLat: $pickupLat');
+      print('🚗 pickupLon: $pickupLon');
+
       final nearbyDrivers = await findNearbyDrivers(
         pickupLat: pickupLat,
         pickupLon: pickupLon,
