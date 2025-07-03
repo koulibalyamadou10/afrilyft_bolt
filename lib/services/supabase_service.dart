@@ -387,12 +387,12 @@ class SupabaseService {
       print("radius km : $radiusKm");
       print("max drivers : $maxDrivers");
       final response = await _client.rpc(
-        'find_nearby_drivers_pro',
+        'find_nearby_drivers',
         params: {
-          'pickup_lat': 9.62949690,
-          'pickup_lon': -13.61655150,
-          'radius_km': 10000,
-          'max_drivers': 10,
+          'pickup_lat': pickupLat,
+          'pickup_lon': pickupLon,
+          'radius_km': radiusKm,
+          'max_drivers': maxDrivers,
         },
       );
 
