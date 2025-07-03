@@ -580,4 +580,17 @@ class RideController extends GetxController {
       );
     }).toSet();
   }
+
+  /// Récupère toutes les infos du trajet, client, chauffeur et position chauffeur
+  Future<Map<String, dynamic>?> getRideDetail(String rideId) async {
+    final response =
+        await SupabaseService.client
+            .from('rides')
+            .select(
+              '*, customer:profiles!rides_customer_id_fkey(*), driver:profiles!rides_driver_id_fkey(*), driver_location:driver_locations(driver_id, latitude, longitude, heading, speed, last_updated)',
+            )
+            .eq('id', rideId)
+            .single();
+    return response;
+  }
 }

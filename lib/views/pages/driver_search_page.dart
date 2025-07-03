@@ -1,8 +1,10 @@
+import 'package:afrilyft/models/ride_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:afrilyft/views/pages/create_ride_page.dart';
-import '../../controllers/ride_controller.dart';
+import 'package:afrilyft/controllers/ride_controller.dart';
 import '../../theme/app_colors.dart';
+import 'ride_detail_page.dart';
 
 class DriverSearchPage extends StatefulWidget {
   const DriverSearchPage({Key? key}) : super(key: key);
@@ -49,6 +51,9 @@ class _DriverSearchPageState extends State<DriverSearchPage>
             Get.offAllNamed('/home');
           }
         });
+      } else if (ride.status == RideStatus.accepted) {
+        // Naviguer vers la page détail
+        Get.offAll(() => RideDetailPage(rideId: ride.id));
       }
     });
   }

@@ -391,8 +391,8 @@ class SupabaseService {
         params: {
           'pickup_lat': pickupLat,
           'pickup_lon': pickupLon,
-          'radius_km': radiusKm,
-          'max_drivers': maxDrivers,
+          // 'radius_km': radiusKm,
+          // 'max_drivers': maxDrivers,
         },
       );
 
