@@ -224,7 +224,6 @@ class _CreateRidePageState extends State<CreateRidePage> {
         setState(() {
           _pickupController.text = address;
           _pickupLat = position.latitude;
-          _pickupLon = position.longitude;
         });
       } else {
         setState(() {

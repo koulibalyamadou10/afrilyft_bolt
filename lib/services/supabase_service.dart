@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -256,39 +258,6 @@ class SupabaseService {
       // Trouver des chauffeurs à proximité (séparément)
       print('🔍 Recherche de chauffeurs à proximité...');
 
-      // Affihcer le pickuplat et pickuplon
-      print('🚗 pickupLat: $pickupLat');
-      print('🚗 pickupLon: $pickupLon');
-
-      final nearbyDrivers = await findNearbyDrivers(
-        pickupLat: pickupLat,
-        pickupLon: pickupLon,
-        radiusKm: 10,
-        maxDrivers: 10,
-      );
-
-      print('🚗 ${nearbyDrivers.length} chauffeurs trouvés à proximité');
-
-      // Créer des demandes de trajet pour les chauffeurs à proximité
-      if (nearbyDrivers.isNotEmpty) {
-        print('📨 Envoi des demandes aux chauffeurs...');
-        final rideRequests =
-            nearbyDrivers
-                .map(
-                  (driver) => ({
-                    'ride_id': rideId,
-                    'driver_id': driver['driver_id'],
-                    'status': 'sent',
-                  }),
-                )
-                .toList();
-
-        await _client.from('ride_requests').insert(rideRequests);
-        print('✅ Demandes envoyées aux chauffeurs');
-      } else {
-        print('⚠️ Aucun chauffeur trouvé à proximité');
-      }
-
       return rideId;
     } catch (e) {
       print('❌ Erreur lors de la création du trajet: $e');
@@ -409,12 +378,47 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> findNearbyDrivers({
     required double pickupLat,
     required double pickupLon,
-    double radiusKm = 5.0,
+    double radiusKm = 10000,
     int maxDrivers = 10,
   }) async {
     try {
+      print("pickup lat : $pickupLat");
+      print("pickup lon : $pickupLon");
+      print("radius km : $radiusKm");
+      print("max drivers : $maxDrivers");
       final response = await _client.rpc(
-        'find_nearby_drivers',
+        'find_nearby_drivers_pro',
+        params: {
+          'pickup_lat': 9.62949690,
+          'pickup_lon': -13.61655150,
+          'radius_km': 10000,
+          'max_drivers': 10,
+        },
+      );
+
+      print("response : $response");
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Erreur lors de la recherche de chauffeurs: $e');
+      return [];
+    }
+  }
+
+  // Recherche de chauffeurs (nouvelle version PRO)
+  static Future<List<Map<String, dynamic>>> findNearbyDriversPro({
+    required double pickupLat,
+    required double pickupLon,
+    double radiusKm = 10000,
+    int maxDrivers = 10,
+  }) async {
+    try {
+      print("pickup lat : $pickupLat");
+      print("pickup lon : $pickupLon");
+      print("radius km : $radiusKm");
+      print("max drivers : $maxDrivers");
+      final response = await _client.rpc(
+        'find_nearby_drivers_pro',
         params: {
           'pickup_lat': pickupLat,
           'pickup_lon': pickupLon,
@@ -423,9 +427,14 @@ class SupabaseService {
         },
       );
 
-      return List<Map<String, dynamic>>.from(response);
+      if (response.error != null) {
+        print('Erreur Supabase : \\${response.error!.message}');
+        return [];
+      }
+      print("response : \\${response.data}");
+      return List<Map<String, dynamic>>.from(response.data as List);
     } catch (e) {
-      print('Erreur lors de la recherche de chauffeurs: $e');
+      print('Erreur lors de la recherche de chauffeurs PRO: $e');
       return [];
     }
   }

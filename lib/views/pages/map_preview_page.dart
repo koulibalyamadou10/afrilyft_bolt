@@ -122,12 +122,6 @@ class _MapPreviewPageState extends State<MapPreviewPage> {
     });
 
     try {
-      // Charger les chauffeurs à proximité pour prévisualisation
-      await rideController.findNearbyDriversPreview(
-        widget.pickupLat,
-        widget.pickupLon,
-      );
-
       // Ajouter les marqueurs des chauffeurs
       _addDriverMarkers();
     } catch (e) {

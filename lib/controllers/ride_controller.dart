@@ -102,51 +102,12 @@ class RideController extends GetxController {
         currentRide.value = activeRide;
         if (activeRide.status == RideStatus.searching) {
           isSearchingDriver.value = true;
-          await findNearbyDriversPreview(
-            activeRide.pickupLat,
-            activeRide.pickupLon,
-          );
         }
       }
     } catch (e) {
       Get.snackbar('Erreur', 'Impossible de charger l\'historique: $e');
     } finally {
       isLoading.value = false;
-    }
-  }
-
-  // NOUVEAU: Prévisualisation des chauffeurs sans créer de trajet
-  Future<void> findNearbyDriversPreview(
-    double pickupLat,
-    double pickupLon,
-  ) async {
-    try {
-      final drivers = await SupabaseService.findNearbyDrivers(
-        pickupLat: pickupLat,
-        pickupLon: pickupLon,
-        radiusKm: 5.0,
-        maxDrivers: 10,
-      );
-
-      nearbyDrivers.value =
-          drivers
-              .map(
-                (driver) => DriverLocation(
-                  id: driver['driver_id'],
-                  driverId: driver['driver_id'],
-                  lat: driver['location_lat'],
-                  lon: driver['location_lon'],
-                  heading: driver['heading']?.toDouble(),
-                  speed: driver['speed']?.toDouble(),
-                  isAvailable: true,
-                  lastUpdated: DateTime.parse(driver['last_updated']),
-                ),
-              )
-              .toList();
-
-      print('${nearbyDrivers.length} chauffeurs trouvés pour prévisualisation');
-    } catch (e) {
-      print('Erreur lors de la recherche de chauffeurs: $e');
     }
   }
 
@@ -301,7 +262,7 @@ class RideController extends GetxController {
       final drivers = await SupabaseService.findNearbyDrivers(
         pickupLat: pickupLat,
         pickupLon: pickupLon,
-        radiusKm: 10.0,
+        radiusKm: 10000,
         maxDrivers: 10,
       );
 
