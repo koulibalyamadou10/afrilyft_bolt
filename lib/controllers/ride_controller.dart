@@ -7,6 +7,7 @@ import '../services/realtime_service.dart';
 import 'dart:math';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class RideController extends GetxController {
   final Rx<RideModel?> currentRide = Rx<RideModel?>(null);
@@ -17,6 +18,8 @@ class RideController extends GetxController {
   final Rx<Position?> currentLocation = Rx<Position?>(null);
   final RxInt timeRemaining = 120.obs; // 2 minutes en secondes
   Timer? _timeoutTimer;
+  late BitmapDescriptor carMarkerIcon;
+  bool _carMarkerLoaded = false;
 
   @override
   void onInit() {
@@ -24,6 +27,7 @@ class RideController extends GetxController {
     _getCurrentLocation();
     _loadRideHistory();
     _initializeRealtime();
+    _loadCarMarkerIcon();
   }
 
   @override
@@ -535,5 +539,45 @@ class RideController extends GetxController {
       case RideStatus.cancelled:
         return const Color(0xFFF44336);
     }
+  }
+
+  Future<void> _loadCarMarkerIcon() async {
+    carMarkerIcon = await BitmapDescriptor.fromAssetImage(
+      const ImageConfiguration(size: Size(48, 48)),
+      'assets/images/car_marker.png',
+    );
+    _carMarkerLoaded = true;
+    update(); // Pour notifier les listeners si besoin
+  }
+
+  /// Retourne les marqueurs Google Maps pour les chauffeurs disponibles
+  Set<Marker> getDriverMarkers() {
+    if (!_carMarkerLoaded) {
+      // Si l'icône n'est pas encore chargée, on utilise l'icône par défaut
+      return nearbyDrivers.map((driver) {
+        return Marker(
+          markerId: MarkerId('driver_${driver.driverId}'),
+          position: LatLng(driver.lat, driver.lon),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
+          infoWindow: InfoWindow(
+            title: 'Chauffeur disponible',
+            snippet: 'Mis à jour: ${driver.lastUpdated}',
+          ),
+        );
+      }).toSet();
+    }
+    return nearbyDrivers.map((driver) {
+      return Marker(
+        markerId: MarkerId('driver_${driver.driverId}'),
+        position: LatLng(driver.lat, driver.lon),
+        icon: carMarkerIcon,
+        infoWindow: InfoWindow(
+          title: 'Chauffeur disponible',
+          snippet: 'Mis à jour: ${driver.lastUpdated}',
+        ),
+      );
+    }).toSet();
   }
 }
